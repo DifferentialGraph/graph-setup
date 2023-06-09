@@ -1,0 +1,54 @@
+#!/bin/bash
+
+base-config()
+{
+    apt update && apt -y install ca-certificates curl gnupg grep apache2-utils npm
+
+    if ! grep -q "docker" <<< $(find /etc/apt/ -name *.list | xargs cat | grep  ^[[:space:]]*deb | grep -v deb-src); then
+        echo "Adding Docker repository"
+        mkdir -m 0755 -p /etc/apt/keyrings
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+        echo "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+            "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
+            tee /etc/apt/sources.list.d/docker.list > /dev/null
+        apt update && apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin docker-compose
+    fi
+
+    npm install -g pino-pretty
+}
+
+generate-node-config() 
+{
+# Datbase
+cat <<EOF >$1
+[store]
+[store.primary]
+connection = "postgresql://${DB_NODE_USER}:${DB_NODE_PASS}@:5432/${DB_NODE_NAME}?host=/var/run/postgresql"
+pool_size = 10
+
+[chains]
+ingestor = "index_node"
+
+EOF
+
+# Chains
+for (( j=0; j<${#CHAIN_NAME[@]}; j++ ));
+do
+cat <<EOF >>$1
+[chains.${CHAIN_NAME[$j]}]
+shard = "primary"
+provider = [ { label = "${CHAIN_NAME[$j]}", url = "${CHAIN_RPC[$j]}", features = ["archive", "traces"] } ]
+
+EOF
+done
+
+# Deployment
+cat <<EOF >>$1
+[deployment]
+[[deployment.rule]]
+indexers = [ "index_node" ]
+
+[general]
+query = "query_node"
+EOF
+}

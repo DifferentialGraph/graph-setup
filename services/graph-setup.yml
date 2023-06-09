@@ -1,0 +1,426 @@
+version: '3.9'
+
+x-logging:
+  &default-logging
+  options:
+    max-file: '1'
+    compress: 'false'
+  driver: local
+
+volumes:
+  db-node:
+  db-indexer:
+  db-socket:
+  cli-data:
+  node-config:
+    external: true
+    name: ${COMPOSE_PROJECT_NAME}_node-config
+  prometheus:
+  prometheus-config:
+    external: true
+    name: ${COMPOSE_PROJECT_NAME}_prometheus-config
+  grafana:
+  grafana-provisioning:
+    external: true
+    name: ${COMPOSE_PROJECT_NAME}_grafana-provisioning
+  alertmanager-config:
+    external: true
+    name: ${COMPOSE_PROJECT_NAME}_alertmanager-config
+  alertmanager-data:
+
+networks:
+  indexer:
+    name: ${COMPOSE_PROJECT_NAME}-indexer
+
+services:
+############################################
+##### POSTGRES NODE #####
+############################################
+  postgres-node:
+    image: postgres:13.6
+    container_name: ${COMPOSE_PROJECT_NAME}-postgres-node
+    networks:
+      - indexer
+    expose:
+      - 5432
+    command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements"]
+    environment:
+      POSTGRES_USER: ${DB_NODE_USER}
+      POSTGRES_PASSWORD: ${DB_NODE_PASS}
+      POSTGRES_DB: ${DB_NODE_NAME}
+      POSTGRES_INITDB_ARGS: "-E UTF8 --locale=C"
+    volumes:
+      - db-node:/var/lib/postgresql/data
+      - db-socket:/var/run/postgresql
+    restart: unless-stopped
+    logging: *default-logging
+############################################
+
+############################################
+##### POSTGRES INDEXER #####
+############################################
+  postgres-indexer:
+    image: postgres:13.6
+    container_name: ${COMPOSE_PROJECT_NAME}-postgres-indexer
+    networks:
+      - indexer
+    expose:
+      - 5432
+    command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements"]
+    environment:
+      POSTGRES_USER: ${DB_INDEXER_USER}
+      POSTGRES_PASSWORD: ${DB_INDEXER_PASS}
+      POSTGRES_DB: ${DB_INDEXER_NAME}
+      # PGDATA: "/data/${COMPOSE_PROJECT_NAME}-postgres-indexer"
+    volumes:
+      - db-indexer:/var/lib/postgresql/data
+      # - ./data/${COMPOSE_PROJECT_NAME}-postgres-indexer:/var/lib/postgresql/data
+    restart: unless-stopped
+    logging: *default-logging
+############################################
+
+############################################
+################ INDEX NODE ################
+############################################
+  index-node:
+    image: graphprotocol/graph-node:v0.31.0-rc.0
+    container_name: ${COMPOSE_PROJECT_NAME}-index-node
+    networks:
+      - indexer
+    expose:
+      - 8000
+      - 8001
+      - 8030
+      - 8040
+    depends_on:
+      - postgres-node
+      - postgres-indexer
+    # extra_hosts:
+    #   - host.docker.internal:host-gateway
+    environment:
+      node_role: index-node
+      node_id: index_node
+      postgres_host: ${COMPOSE_PROJECT_NAME}-postgres-node
+      postgres_user: ${DB_NODE_USER}
+      postgres_pass: ${DB_NODE_PASS}
+      postgres_db: ${DB_NODE_NAME}
+      ipfs: https://ipfs.network.thegraph.com/ipfs/
+      # ethereum: ${CHAIN_RPC}
+      GRAPH_NODE_CONFIG: /root/node-config/config.toml
+      GRAPH_LOG: DEBUG
+      RUST_LOG: INFO
+      # GRAPH_ETH_CALL_GAS: 50000000
+      GRAPH_GETH_ETH_CALL_ERRORS: "out of gas"
+      GRAPH_MAX_GAS_PER_HANDLER: 1000000000000000
+      ETHEREUM_TRACE_STREAM_STEP_SIZE: 50
+      ETHEREUM_BLOCK_BATCH_SIZE: 10
+      # ETHEREUM_RPC_MAX_PARALLEL_REQUESTS: 64
+      GRAPH_ETHEREUM_MAX_BLOCK_RANGE_SIZE: 2000
+      GRAPH_ETHEREUM_TARGET_TRIGGERS_PER_BLOCK_RANGE: 100
+      GRAPH_KILL_IF_UNRESPONSIVE: true
+      GRAPH_ALLOW_NON_DETERMINISTIC_FULLTEXT_SEARCH: true
+      EXPERIMENTAL_SUBGRAPH_VERSION_SWITCHING_MODE: synced
+      BLOCK_INGESTOR: index_node
+      ETHEREUM_POLLING_INTERVAL: 500
+    volumes:
+      - db-socket:/var/run/postgresql
+      - node-config:/root/node-config/
+    restart: unless-stopped
+    logging: *default-logging
+############################################
+
+############################################
+################ QUERY NODE ################
+############################################
+  query-node:
+    image: graphprotocol/graph-node:v0.31.0-rc.0
+    container_name: ${COMPOSE_PROJECT_NAME}-query-node
+    networks:
+      - indexer
+    expose:
+      - 8000
+      - 8001
+      - 8020
+      - 8030
+      - 8040
+    depends_on:
+      - postgres-node
+      - postgres-indexer
+    # extra_hosts:
+    #   - host.docker.internal:host-gateway
+    environment:
+      node_role: query-node
+      node_id: query_node
+      postgres_host: ${COMPOSE_PROJECT_NAME}-postgres-node
+      postgres_user: ${DB_NODE_USER}
+      postgres_pass: ${DB_NODE_PASS}
+      postgres_db: ${DB_NODE_NAME}
+      ipfs: https://ipfs.network.thegraph.com/ipfs/
+      # ethereum: ${CHAIN_RPC}
+      GRAPH_NODE_CONFIG: /root/node-config/config.toml
+      GRAPH_LOG: DEBUG
+      RUST_LOG: INFO
+      # GRAPH_ETH_CALL_GAS: 50000000
+      GRAPH_GETH_ETH_CALL_ERRORS: "out of gas"
+      GRAPH_MAX_GAS_PER_HANDLER: 1000000000000000
+      GRAPH_LOG_QUERY_TIMING: gql
+      EXPERIMENTAL_SUBGRAPH_VERSION_SWITCHING_MODE: synced
+      GRAPH_KILL_IF_UNRESPONSIVE: true
+      GRAPH_ALLOW_NON_DETERMINISTIC_FULLTEXT_SEARCH: true
+    volumes:
+      - db-socket:/var/run/postgresql
+      - node-config:/root/node-config/
+    restart: unless-stopped
+    logging:
+        driver: "journald"
+############################################
+
+############################################
+############# INDEXER AGENT ################
+############################################
+  indexer-agent:
+    image: ghcr.io/graphprotocol/indexer-agent:v0.20.16
+    container_name: ${COMPOSE_PROJECT_NAME}-indexer-agent
+    networks:
+      - indexer
+    expose:
+      - 7300
+      - 8000
+      - 8001
+      - 8002
+    depends_on:
+      - index-node
+      - query-node
+      - postgres-indexer
+    environment:
+      INDEXER_AGENT_ETHEREUM: ${TXN_RPC}
+      INDEXER_AGENT_ETHEREUM_NETWORK: ${ETHEREUM_NETWORK}
+      INDEXER_AGENT_INDEXER_ADDRESS: ${STAKING_ADDRESS}
+      INDEXER_AGENT_INDEXER_GEO_COORDINATES: ${GEO_COORDINATES}
+      INDEXER_AGENT_MNEMONIC: ${OPERATOR_MNEMONIC}
+      # INDEXER_AGENT_NETWORK_SUBGRAPH_DEPLOYMENT: ${NETWORK_SUBGRAPH_DEPLOYMENT}
+      # INDEXER_AGENT_OFFCHAIN_SUBGRAPHS: ${INDEXER_AGENT_OFFCHAIN_SUBGRAPHS}
+      INDEXER_AGENT_NETWORK_SUBGRAPH_ENDPOINT: ${NETWORK_SUBGRAPH_ENDPOINT}
+      INDEXER_AGENT_COLLECT_RECEIPTS_ENDPOINT: ${COLLECT_RECEIPTS_ENDPOINT}
+      INDEXER_AGENT_GRAPH_NODE_QUERY_ENDPOINT: http://${COMPOSE_PROJECT_NAME}-query-node:8000
+      INDEXER_AGENT_GRAPH_NODE_STATUS_ENDPOINT: http://${COMPOSE_PROJECT_NAME}-index-node:8030/graphql
+      INDEXER_AGENT_GRAPH_NODE_ADMIN_ENDPOINT: http://${COMPOSE_PROJECT_NAME}-index-node:8020
+      INDEXER_AGENT_PUBLIC_INDEXER_URL: https://${INDEX_HOST}/
+      INDEXER_AGENT_INDEX_NODE_IDS: index_node
+      INDEXER_AGENT_POSTGRES_HOST: ${COMPOSE_PROJECT_NAME}-postgres-indexer
+      INDEXER_AGENT_POSTGRES_USERNAME: ${DB_INDEXER_USER}
+      INDEXER_AGENT_POSTGRES_PASSWORD: ${DB_INDEXER_PASS}
+      INDEXER_AGENT_POSTGRES_DATABASE: ${DB_INDEXER_NAME}
+      INDEXER_AGENT_EPOCH_SUBGRAPH_ENDPOINT: ${EPOCH_SUBGRAPH_ENDPOINT}
+      INDEXER_AGENT_DAI_CONTRACT: ${DAI_CONTRACT}
+      INDEXER_AGENT_INJECT_DAI: ${INJECT_DAI:-true}
+      INDEXER_AGENT_GAS_PRICE_MAX: ${GAS_PRICE_MAX:-100}
+      INDEXER_AGENT_REBATE_CLAIM_THRESHOLD: ${REBATE_CLAIM_THRESHOLD:-200}
+      INDEXER_AGENT_REBATE_CLAIM_BATCH_THRESHOLD: ${REBATE_CLAIM_BATCH_THRESHOLD:-2000}
+      INDEXER_AGENT_REBATE_CLAIM_MAX_BATCH_SIZE: ${REBATE_CLAIM_MAX_BATCH_SIZE:-100}
+      INDEXER_AGENT_VOUCHER_REDEMPTION_THRESHOLD: ${VOUCHER_REDEMPTION_THRESHOLD:-200}
+      INDEXER_AGENT_VOUCHER_REDEMPTION_BATCH_THRESHOLD: ${VOUCHER_REDEMPTION_BATCH_THRESHOLD:-2000}
+      INDEXER_AGENT_VOUCHER_REDEMPTION_MAX_BATCH_SIZE: ${VOUCHER_REDEMPTION_MAX_BATCH_SIZE:-100}
+    restart: unless-stopped
+    logging: *default-logging
+############################################
+
+############################################
+############## INDEXER SERVICE #############
+############################################
+  indexer-service:
+    image: ghcr.io/graphprotocol/indexer-service:v0.20.16
+    container_name: ${COMPOSE_PROJECT_NAME}-indexer-service
+    profiles: ["no-autoagora"]
+    networks:
+      - indexer
+    expose:
+      - 7300
+      - 7600
+    depends_on:
+      - index-node
+      - query-node
+      - indexer-agent
+      - postgres-indexer
+    environment:
+      INDEXER_SERVICE_ETHEREUM: ${TXN_RPC}
+      INDEXER_SERVICE_ETHEREUM_NETWORK: ${ETHEREUM_NETWORK}
+      INDEXER_SERVICE_INDEXER_ADDRESS: ${STAKING_ADDRESS}
+      INDEXER_SERVICE_MNEMONIC: ${OPERATOR_MNEMONIC}
+      INDEXER_SERVICE_PORT: 7600
+      # INDEXER_SERVICE_NETWORK_SUBGRAPH_DEPLOYMENT: ${NETWORK_SUBGRAPH_DEPLOYMENT}
+      INDEXER_SERVICE_NETWORK_SUBGRAPH_ENDPOINT: ${NETWORK_SUBGRAPH_ENDPOINT}
+      INDEXER_SERVICE_CLIENT_SIGNER_ADDRESS: ${CLIENT_SIGNER_ADDRESS}
+      INDEXER_SERVICE_GRAPH_NODE_QUERY_ENDPOINT: http://${COMPOSE_PROJECT_NAME}-query-node:8000
+      INDEXER_SERVICE_GRAPH_NODE_STATUS_ENDPOINT: http://${COMPOSE_PROJECT_NAME}-index-node:8030/graphql
+      INDEXER_SERVICE_POSTGRES_HOST: ${COMPOSE_PROJECT_NAME}-postgres-indexer
+      INDEXER_SERVICE_POSTGRES_USERNAME: ${DB_INDEXER_USER}
+      INDEXER_SERVICE_POSTGRES_PASSWORD: ${DB_INDEXER_PASS}
+      INDEXER_SERVICE_POSTGRES_DATABASE: ${DB_INDEXER_NAME}
+      VIRTUAL_HOST: ${INDEX_HOST}
+      VIRTUAL_PORT: 7600
+      LETSENCRYPT_HOST: ${INDEX_HOST}
+    restart: unless-stopped
+    logging: *default-logging
+############################################
+
+############################################
+############## CLI #############
+############################################
+  indexer-cli:
+    build:
+      args:
+        VERSION: v0.20.16
+        PROJECT: ${COMPOSE_PROJECT_NAME}
+      context: ../cli
+      dockerfile: Dockerfile
+    container_name: ${COMPOSE_PROJECT_NAME}-indexer-cli
+    networks:
+      - indexer
+    tty: true
+    volumes:
+      - cli-data:/root/data
+    restart: unless-stopped
+    logging: *default-logging
+############################################
+
+############################################
+############## PROMETHEUS #############
+############################################
+  prometheus:
+    image: prom/prometheus
+    container_name: ${COMPOSE_PROJECT_NAME}-prometheus
+    networks:
+      - indexer
+    environment:
+      PROJECT: ${COMPOSE_PROJECT_NAME}
+      VIRTUAL_HOST: ${PROMETHEUS_HOST}
+      VIRTUAL_PORT: 9090
+      LETSENCRYPT_HOST: ${PROMETHEUS_HOST}
+    volumes:
+      - prometheus-config:/etc/prometheus
+      - prometheus:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    expose:
+      - 9090
+    restart: unless-stopped
+    logging: *default-logging
+############################################
+
+############################################
+############## GRAFANA #############
+############################################
+  grafana:
+    image: grafana/grafana
+    container_name: ${COMPOSE_PROJECT_NAME}-grafana
+    networks:
+      - indexer
+    depends_on:
+      - postgres-node
+    volumes:
+      - grafana:/var/lib/grafana
+      - grafana-provisioning:/etc/grafana/provisioning
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASS}
+      GF_USERS_ALLOW_SIGN_UP: false
+      GF_SECURITY_DISABLE_BRUTE_FORCE_LOGIN_PROTECTION: true
+      GF_INSTALL_PLUGINS: fifemon-graphql-datasource
+      PROJECT: ${COMPOSE_PROJECT_NAME}
+      POSTGRES_HOST: ${COMPOSE_PROJECT_NAME}-postgres-node
+      POSTGRES_USER: ${DB_NODE_USER}
+      POSTGRES_PASS: ${DB_NODE_PASS}
+      POSTGRES_DB: ${DB_NODE_NAME}
+      SUBGRAPH_ENDPOINT: ${NETWORK_SUBGRAPH_ENDPOINT}
+      PROMETHEUS_HOST: ${COMPOSE_PROJECT_NAME}-prometheus
+      VIRTUAL_HOST: ${GRAFANA_HOST}
+      VIRTUAL_PORT: 3000
+      LETSENCRYPT_HOST: ${GRAFANA_HOST}
+    expose:
+      - 3000
+    restart: unless-stopped
+    logging: *default-logging
+############################################
+
+############################################
+############## ALERT MANAGER #############
+############################################
+  alertmanager:
+    image: prom/alertmanager
+    container_name: ${COMPOSE_PROJECT_NAME}-alertmanager
+    networks:
+      - indexer
+    volumes:
+      - alertmanager-config:/etc/alertmanager
+      - alertmanager-data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/config.yml'
+      - '--storage.path=/alertmanager'
+    expose:
+      - 9093
+    restart: unless-stopped
+    logging: *default-logging
+############################################
+
+############################################
+############## NODE EXPORTER #############
+############################################
+  node-exporter:
+    image: prom/node-exporter
+    container_name: ${COMPOSE_PROJECT_NAME}-node-exporter
+    networks:
+      - indexer
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
+    expose:
+      - 9100
+    restart: unless-stopped
+    logging: *default-logging
+############################################
+
+############################################
+############## CADVISOR #############
+############################################
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor
+    container_name: ${COMPOSE_PROJECT_NAME}-cadvisor
+    networks:
+      - indexer
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /cgroup:/cgroup:ro #doesn't work on MacOS only for Linux
+    expose:
+      - 8080
+    restart: unless-stopped
+    logging: *default-logging
+############################################
+
+############################################
+############## PUSHGATEWAY #############
+############################################
+  pushgateway:
+    image: prom/pushgateway
+    container_name: ${COMPOSE_PROJECT_NAME}-pushgateway
+    networks:
+      - indexer
+    expose:
+      - 9091
+    restart: unless-stopped
+    logging: *default-logging
+############################################

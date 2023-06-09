@@ -1,0 +1,6 @@
+data/
+.env.user
+.env.*
+nginx-proxy/htpasswd/
+config-*.toml
+prometheus-*

@@ -1,0 +1,15 @@
+apiVersion: 1
+datasources:
+- name: postgres
+  access: proxy
+  editable: true
+  orgId: 1
+  type: postgres
+  url: ${POSTGRES_HOST}
+  user: ${POSTGRES_USER}
+  database: ${POSTGRES_DB}
+  secureJsonData:
+    password: ${POSTGRES_PASS}
+  jsonData:
+    sslmode: disable
+    postgresVersion: 906

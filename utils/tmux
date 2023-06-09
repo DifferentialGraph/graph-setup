@@ -1,0 +1,5 @@
+#!/bin/bash
+
+close-session() {
+    tmux kill-session -t $1
+}

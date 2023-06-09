@@ -1,0 +1,9 @@
+apiVersion: 1
+datasources:
+- name: prometheus
+  access: proxy
+  editable: true
+  orgId: 1
+  type: prometheus
+  url: http://${PROMETHEUS_HOST}:9090
+  version: 1

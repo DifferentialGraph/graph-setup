@@ -17,7 +17,7 @@ services:
 ##### AUTOAGORA #####
 ############################################
   autoagora:
-    image: ghcr.io/semiotic-ai/autoagora:v1.3.0
+    image: ghcr.io/semiotic-ai/autoagora:v2.0.0
     container_name: ${COMPOSE_PROJECT_NAME}-autoagora
     networks:
       - indexer
@@ -47,7 +47,7 @@ services:
 ##### AUTOAGORA INDEXER SERVICE #####
 ############################################
   autoagora-indexer-service:
-    image: ghcr.io/semiotic-ai/autoagora-indexer-service:v0.1.2-v0.20.16
+    image: ghcr.io/semiotic-ai/autoagora-indexer-service:v0.1.2-v0.20.22
     container_name: ${COMPOSE_PROJECT_NAME}-indexer-service
     depends_on:
       - index-node
@@ -87,7 +87,7 @@ services:
 ##### AUTOAGORA PROCESSOR #####
 ############################################
   autoagora-processor:
-    image: kwetlesen/autoagora-processor:latest
+    image: ghcr.io/semiotic-ai/autoagora-processor:latest
     container_name: ${COMPOSE_PROJECT_NAME}-autoagora-processor
     networks:
       - indexer

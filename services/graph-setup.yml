@@ -83,7 +83,7 @@ services:
 ################ INDEX NODE ################
 ############################################
   index-node:
-    image: graphprotocol/graph-node:v0.31.0-rc.0
+    image: graphprotocol/graph-node:v0.32.0
     container_name: ${COMPOSE_PROJECT_NAME}-index-node
     networks:
       - indexer
@@ -133,7 +133,7 @@ services:
 ################ QUERY NODE ################
 ############################################
   query-node:
-    image: graphprotocol/graph-node:v0.31.0-rc.0
+    image: graphprotocol/graph-node:v0.32.0
     container_name: ${COMPOSE_PROJECT_NAME}-query-node
     networks:
       - indexer
@@ -179,7 +179,7 @@ services:
 ############# INDEXER AGENT ################
 ############################################
   indexer-agent:
-    image: ghcr.io/graphprotocol/indexer-agent:v0.20.16
+    image: ghcr.io/graphprotocol/indexer-agent:v0.20.22
     container_name: ${COMPOSE_PROJECT_NAME}-indexer-agent
     networks:
       - indexer
@@ -229,7 +229,7 @@ services:
 ############## INDEXER SERVICE #############
 ############################################
   indexer-service:
-    image: ghcr.io/graphprotocol/indexer-service:v0.20.16
+    image: ghcr.io/graphprotocol/indexer-service:v0.20.22
     container_name: ${COMPOSE_PROJECT_NAME}-indexer-service
     profiles: ["no-autoagora"]
     networks:
@@ -270,7 +270,7 @@ services:
   indexer-cli:
     build:
       args:
-        VERSION: v0.20.16
+        VERSION: v0.20.22
         PROJECT: ${COMPOSE_PROJECT_NAME}
       context: ../cli
       dockerfile: Dockerfile

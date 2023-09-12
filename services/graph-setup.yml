@@ -37,7 +37,7 @@ services:
 ##### POSTGRES NODE #####
 ############################################
   postgres-node:
-    image: postgres:13.6
+    image: postgres:15.4
     container_name: ${COMPOSE_PROJECT_NAME}-postgres-node
     networks:
       - indexer
@@ -60,7 +60,7 @@ services:
 ##### POSTGRES INDEXER #####
 ############################################
   postgres-indexer:
-    image: postgres:13.6
+    image: postgres:15.4
     container_name: ${COMPOSE_PROJECT_NAME}-postgres-indexer
     networks:
       - indexer
@@ -200,6 +200,7 @@ services:
       INDEXER_AGENT_MNEMONIC: ${OPERATOR_MNEMONIC}
       # INDEXER_AGENT_NETWORK_SUBGRAPH_DEPLOYMENT: ${NETWORK_SUBGRAPH_DEPLOYMENT}
       # INDEXER_AGENT_OFFCHAIN_SUBGRAPHS: ${INDEXER_AGENT_OFFCHAIN_SUBGRAPHS}
+      INDEXER_AGENT_MULTINETWORK_MODE: ${MULTINETWORK_MODE}
       INDEXER_AGENT_NETWORK_SUBGRAPH_ENDPOINT: ${NETWORK_SUBGRAPH_ENDPOINT}
       INDEXER_AGENT_COLLECT_RECEIPTS_ENDPOINT: ${COLLECT_RECEIPTS_ENDPOINT}
       INDEXER_AGENT_GRAPH_NODE_QUERY_ENDPOINT: http://${COMPOSE_PROJECT_NAME}-query-node:8000
@@ -221,6 +222,7 @@ services:
       INDEXER_AGENT_VOUCHER_REDEMPTION_THRESHOLD: ${VOUCHER_REDEMPTION_THRESHOLD:-200}
       INDEXER_AGENT_VOUCHER_REDEMPTION_BATCH_THRESHOLD: ${VOUCHER_REDEMPTION_BATCH_THRESHOLD:-2000}
       INDEXER_AGENT_VOUCHER_REDEMPTION_MAX_BATCH_SIZE: ${VOUCHER_REDEMPTION_MAX_BATCH_SIZE:-100}
+      INDEXER_AGENT_ALLOCATION_MANAGEMENT: ${ALLOCATION_MANAGEMENT}
     restart: unless-stopped
     logging: *default-logging
 ############################################

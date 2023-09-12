@@ -118,7 +118,7 @@ services:
 ##### AUTOAGORA DATABASE #####
 ############################################
   postgres-autoagora:
-    image: postgres:13.6
+    image: postgres:15.4
     container_name: ${COMPOSE_PROJECT_NAME}-postgres-autoagora
     networks:
       - indexer
@@ -139,7 +139,7 @@ services:
 ##### RABBITMQ #####
 ############################################
   rabbitmq:
-    image: rabbitmq:3.9.25
+    image: rabbitmq:3.11
     container_name: ${COMPOSE_PROJECT_NAME}-rabbitmq
     networks:
       - indexer

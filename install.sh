@@ -36,43 +36,40 @@ if [ ! -f .env.$PROJECT ]; then
   echo "GRAFANA_HOST=dashboard-$PROJECT.$HOST" >> .env.$PROJECT
   echo "PROMETHEUS_HOST=prometheus-$PROJECT.$HOST" >> .env.$PROJECT
 
-  if [ "$NETWORK" = "main" ]; then
-    echo "You are chosing to operate on the MAIN network"
-    
-    # Agent / Service
-    echo "TXN_RPC=$TXN_RPC_MAIN" >> .env.$PROJECT
+  if [ "$NETWORK" = "mainnet" ]; then
+    echo "TXN_RPC=$TXN_RPC_MAINNET" >> .env.$PROJECT
     echo "ETHEREUM_NETWORK="mainnet"" >> .env.$PROJECT
     echo "NETWORK_SUBGRAPH_ENDPOINT="https://api.thegraph.com/subgraphs/name/graphprotocol/graph-network-mainnet"" >> .env.$PROJECT
-
-    # Agent
     echo "DAI_CONTRACT="0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"" >> .env.$PROJECT
     echo "COLLECT_RECEIPTS_ENDPOINT="https://gateway.network.thegraph.com/collect-receipts"" >> .env.$PROJECT
     echo "EPOCH_SUBGRAPH_ENDPOINT="https://api.thegraph.com/subgraphs/name/graphprotocol/mainnet-epoch-block-oracle"" >> .env.$PROJECT
-
-    # Service
     echo "CLIENT_SIGNER_ADDRESS="0x982D10c56b8BBbD6e09048F5c5f01b43C65D5aE0"" >> .env.$PROJECT
-  elif [ "$NETWORK" = "test" ]; then
-    echo "You are chosing to operate on the TEST network"
-
-    # Agent / Service
-    echo "TXN_RPC=$TXN_RPC_TEST" >> .env.$PROJECT
+  elif [ "$NETWORK" = "goerli" ]; then
+    echo "TXN_RPC=$TXN_RPC_GOERLI" >> .env.$PROJECT
     echo "ETHEREUM_NETWORK="goerli"" >> .env.$PROJECT
     echo "NETWORK_SUBGRAPH_ENDPOINT="https://api.thegraph.com/subgraphs/name/graphprotocol/graph-network-goerli"" >> .env.$PROJECT
-    # echo "ETHEREUM_NETWORK="arbitrum-goerli"" >> .env.$PROJECT
-    # echo "NETWORK_SUBGRAPH_ENDPOINT="https://api.thegraph.com/subgraphs/name/graphprotocol/graph-network-arbitrum-goerli"" >> .env.$PROJECT
-    
-    # Agent
     echo "DAI_CONTRACT="0x9e7e607afd22906f7da6f1ec8f432d6f244278be"" >> .env.$PROJECT
     echo "COLLECT_RECEIPTS_ENDPOINT="https://gateway.testnet.thegraph.com/collect-receipts"" >> .env.$PROJECT
     echo "EPOCH_SUBGRAPH_ENDPOINT="https://api.thegraph.com/subgraphs/name/graphprotocol/goerli-epoch-block-oracle"" >> .env.$PROJECT
-    # echo "COLLECT_RECEIPTS_ENDPOINT="https://gateway-testnet-arbitrum.network.thegraph.com/collect-receipts"" >> .env.$PROJECT
-    # echo "EPOCH_SUBGRAPH_ENDPOINT="https://api.thegraph.com/subgraphs/name/juanmardefago/arb-goerli-epoch-block-oracle"" >> .env.$PROJECT
-
-    # Service
     echo "CLIENT_SIGNER_ADDRESS="0xe1EC4339019eC9628438F8755f847e3023e4ff9c"" >> .env.$PROJECT
-    # echo "INDEXER_SERVICE_CLIENT_SIGNER_ADDRESS="0xac01B0b3B2Dc5D8E0D484c02c4d077C15C96a7b4"" >> .env.$PROJECT
+  elif [ "$NETWORK" = "arbitrum-one" ]; then
+    echo "TXN_RPC=$TXN_RPC_ARBITRUM" >> .env.$PROJECT
+    echo "ETHEREUM_NETWORK="arbitrum"" >> .env.$PROJECT
+    echo "NETWORK_SUBGRAPH_ENDPOINT="https://api.thegraph.com/subgraphs/name/graphprotocol/graph-network-arbitrum"" >> .env.$PROJECT
+    # echo "DAI_CONTRACT="0x9e7e607afd22906f7da6f1ec8f432d6f244278be"" >> .env.$PROJECT
+    echo "COLLECT_RECEIPTS_ENDPOINT="https://gateway.network.thegraph.com/collect-receipts"" >> .env.$PROJECT
+    echo "EPOCH_SUBGRAPH_ENDPOINT="https://api.thegraph.com/subgraphs/name/graphprotocol/arbitrum-epoch-block-oracle"" >> .env.$PROJECT
+    echo "CLIENT_SIGNER_ADDRESS="0xc483960d4D58eabc434Dc88a620AdFd883D6Dd4e"" >> .env.$PROJECT
+  elif [ "$NETWORK" = "arbitrum-goerli" ]; then
+    echo "TXN_RPC=$TXN_RPC_ARBITRUM_GOERLI" >> .env.$PROJECT
+    echo "ETHEREUM_NETWORK="goerli"" >> .env.$PROJECT
+    echo "NETWORK_SUBGRAPH_ENDPOINT="https://api.thegraph.com/subgraphs/name/graphprotocol/graph-network-arbitrum-goerli"" >> .env.$PROJECT
+    # echo "DAI_CONTRACT="0x9e7e607afd22906f7da6f1ec8f432d6f244278be"" >> .env.$PROJECT
+    echo "COLLECT_RECEIPTS_ENDPOINT="https://gateway-testnet-arbitrum.network.thegraph.com/collect-receipts"" >> .env.$PROJECT
+    echo "EPOCH_SUBGRAPH_ENDPOINT="https://api.thegraph.com/subgraphs/name/graphprotocol/arb-goerli-epoch-block-oracle"" >> .env.$PROJECT
+    echo "CLIENT_SIGNER_ADDRESS="0xac01B0b3B2Dc5D8E0D484c02c4d077C15C96a7b4"" >> .env.$PROJECT
   else
-    echo "Choose either main or test" >&2
+    echo "Error: network not found." >&2
     exit 1
   fi
 

@@ -12,15 +12,19 @@ In order to install you graph setup you just have to run, from within the graph-
 ```sh
 ./install.sh <name-of-your-node> <network>
 ```
-In `<name-of-your-node>` choose the name for your graph node. This will create a group of docker containers related to the specific name you chose. A specific docker network will be created as well. This means that you can run multiple indexers in parallel on the same machine. `<network>` can be set to either `main`, to operate on the ethereum mainnet, or `test`, to operate on ethereum goerli.
+In `<name-of-your-node>` choose the name for your graph node. This will create a group of docker containers related to the specific name you chose. A specific docker network will be created as well. This means that you can run multiple indexers in parallel on the same machine. `<network>` can be set to:
+- `mainnet` -> operate on the ethereum mainnet;
+- `goerli` -> operate on ethereum goerli;
+- `arbitrum-one` -> operate on the arbitrum mainnet;
+- `arbitrum-goerli` -> operate on arbitrum goerli.
 
-Be aware that you should not run multiple indexers on the mainnet from the same server. We developed this framework in order to handle the MIPS on the goerli test net while running our main indexer on the mainnet using only one server. For instance we created our main graph setup, operating on the mainnet, with
+For instance, in order to create a graph setup operating on the ethereum mainnet run
 ```sh
-./install.sh main main
+./install.sh main mainnet
 ```
-and the MIPS graph setup, operating on the goerli net, with
+In order to create a graph setup operating on the ethereum goerli net run
 ```sh
-./install.sh mips test
+./install.sh test goerli
 ```
 There is no need to install docker or other packages. If the necessary packages are not present on your machine the installation script will take care of them.
 
@@ -66,8 +70,10 @@ At the moment you also have the opportunity to start and stop separately the rev
 ### Blockchains Supported
 - `CHAIN_NAME` -> it is an array variable. Here you should specify the chains that you want to support your graph node, e.g. `CHAIN_NAME=(mainnet gnosis)`. Available chains after the MIPS program: `mainnet`, `gnosis`, `matic`, `celo`, `arbitrum-one`, `avalanche`, `fantom`, `optimism`.
 - `CHAIN_RPC` -> it is an array variable. Here you should specify the RPC for the chains you specified the CHAIN_NAME variable, e.g. `CHAIN_RPC=(http(s)://<ethereum-rpc> http(s)://<gnosis-rpc>)`.
-- `TXN_RPC_MAIN` -> the RPC for transaction in case your indexer operates on the **mainnet**.
-- `TXN_RPC_MAIN` -> the RPC for transaction in case your indexer operates on the **testnet** (goerli).
+- `TXN_RPC_MAINNET` -> the RPC for transaction in case your indexer operates on the **mainnet**.
+- `TXN_RPC_GOERLI` -> the RPC for transaction in case your indexer operates on the **goerli**.
+- `TXN_RPC_ARBITRUM` -> the RPC for transaction in case your indexer operates on the **arbitrum**.
+- `TXN_RPC_ARBITRUM_GOERLI` -> the RPC for transaction in case your indexer operates on the **arbitrum-goerli**.
 
 ### Indexer Info
 These variables identify information regarding your indexer:

@@ -1,118 +1,181 @@
-#!/bin/
+#!/bin/bash
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. $DIR/docker
+. $DIR/configure
 
 graph-start() {
-    source .env.$1
-
+    source $GRAPH_DIR/.env.$1
     if $AUTOAGORA; then 
-        COMPOSE_FILE=services/graph-setup.yml:services/autoagora.yml
         COMPOSE_PROFILES=autoagora
     else
-        COMPOSE_FILE=services/graph-setup.yml
         COMPOSE_PROFILES=no-autoagora
     fi
+    export PROJECT=$COMPOSE_PROJECT_NAME
 
     case $2 in
-        "proxy")
-            COMPOSE_PROJECT_NAME=proxy COMPOSE_PROFILES=$PROXY EMAIL=email@$HOST WHITELIST=$WHITELIST docker compose -f services/reverse-proxy.yml up -d --remove-orphans --force-recreate --build
-            ;;
         "node")
-            source utils/configure
-            NODE_CONFIG_FILE=/var/lib/docker/volumes/${COMPOSE_PROJECT_NAME}_node-config/_data/config.toml
+            echo "Start graph NODE"
+            # create node configuration volume
+            if ! volume-exists ${PROJECT}_node-config; then
+                docker volume create ${PROJECT}_node-config
+            fi
+
+            # generate graph node configuration files
+            NODE_CONFIG_FILE=/var/lib/docker/volumes/${PROJECT}_node-config/_data/config.toml
             generate-node-config $NODE_CONFIG_FILE
-            COMPOSE_FILE=$COMPOSE_FILE COMPOSE_PROFILES=$COMPOSE_PROFILES docker compose --env-file .env.$1 up -d --remove-orphans --force-recreate --build index-node query-node
+
+            # start docker compose
+            COMPOSE_FILE=$GRAPH_DIR/services/node.yml \
+            COMPOSE_PROFILES=$COMPOSE_PROFILES \
+            COMPOSE_IGNORE_ORPHANS=True \
+            docker compose --env-file $GRAPH_DIR/.env.$1 up -d --force-recreate --build
+            
+            # attach graph node to local chains
             for node in "${CHAIN_NAME[@]}"
             do
             if [ $node == 'mainnet' ]; then 
                 node=ethereum 
             fi
             if [ "$(docker network ls -f name=$node -q)" ]; then
-                docker network connect $node ${COMPOSE_PROJECT_NAME}-index-node
-                docker network connect $node ${COMPOSE_PROJECT_NAME}-query-node
+                docker network connect $node ${PROJECT}-index-node
+                docker network connect $node ${PROJECT}-query-node
             fi
             done
             ;;
         "indexer")
-            COMPOSE_FILE=$COMPOSE_FILE COMPOSE_PROFILES=$COMPOSE_PROFILES docker compose --env-file .env.$1 up -d --remove-orphans --force-recreate --build indexer-agent indexer-service indexer-cli
+            echo "Starting graph INDEXER"
+            COMPOSE_FILE=$GRAPH_DIR/services/indexer.yml \
+            COMPOSE_PROFILES=$COMPOSE_PROFILES \
+            COMPOSE_IGNORE_ORPHANS=True \
+            docker compose --env-file $GRAPH_DIR/.env.$1 up -d --force-recreate --build
+
+            # cli history
+            if [ ! -f /var/lib/docker/volumes/${PROJECT}_cli-history/_data/.bash_history ]; then
+                touch /var/lib/docker/volumes/${PROJECT}_cli-history/_data/.bash_history
+            fi
             ;;
         "monitor")
-            export PROJECT=$COMPOSE_PROJECT_NAME
-            
-            # Prometheus Config
-            rm -rf /var/lib/docker/volumes/${PROJECT}_prometheus-config/_data/alert.rules /var/lib/docker/volumes/${PROJECT}_prometheus-config/_data/prometheus.yml
+            echo "Starting graph MONITOR"
+
+            # Prometheus
+            if ! volume-exists ${PROJECT}_prometheus-config; then
+                docker volume create ${PROJECT}_prometheus-config
+            else
+                rm -rf /var/lib/docker/volumes/${PROJECT}_prometheus-config/_data/alert.rules /var/lib/docker/volumes/${PROJECT}_prometheus-config/_data/prometheus.yml
+            fi
             envsubst '${PROJECT}' < prometheus/alert.rules > /var/lib/docker/volumes/${PROJECT}_prometheus-config/_data/alert.rules
             envsubst < prometheus/prometheus.yml > /var/lib/docker/volumes/${PROJECT}_prometheus-config/_data/prometheus.yml
             
-            # Grafana Config
-            rm -rf /var/lib/docker/volumes/${PROJECT}_grafana-provisioning/_data/*
+            # Grafana
+            if ! volume-exists ${PROJECT}_grafana-provisioning; then
+                docker volume create ${PROJECT}_grafana-provisioning
+            else
+                rm -rf /var/lib/docker/volumes/${PROJECT}_grafana-provisioning/_data/*
+            fi
             cp -R grafana/dashboards/ grafana/datasources/ /var/lib/docker/volumes/${PROJECT}_grafana-provisioning/_data
             envsubst < grafana/dashboards/indexing-performance-metrics.json > /var/lib/docker/volumes/${PROJECT}_grafana-provisioning/_data/dashboards/indexing-performance-metrics.json
+            
+            # Alertmanager
+            if ! volume-exists ${PROJECT}_alertmanager-config; then
+                docker volume create ${PROJECT}_alertmanager-config
+                cp alertmanager/config.yml /var/lib/docker/volumes/${PROJECT}_alertmanager-config/_data
+            fi
 
-            COMPOSE_FILE=$COMPOSE_FILE COMPOSE_PROFILES=$COMPOSE_PROFILES docker compose --env-file .env.$1 up -d --force-recreate --build grafana prometheus
-            unset PROJECT
+            COMPOSE_FILE=$GRAPH_DIR/services/monitor.yml \
+            COMPOSE_PROFILES=$COMPOSE_PROFILES \
+            COMPOSE_IGNORE_ORPHANS=True \
+            docker compose --env-file $GRAPH_DIR/.env.$1 up -d --force-recreate --build
             ;;
-        "all")
-            source utils/configure
-            NODE_CONFIG_FILE=/var/lib/docker/volumes/${COMPOSE_PROJECT_NAME}_node-config/_data/config.toml
-            generate-node-config $NODE_CONFIG_FILE
-
-            export PROJECT=$COMPOSE_PROJECT_NAME
-            
-            # Prometheus Config
-            rm -rf /var/lib/docker/volumes/${PROJECT}_prometheus-config/_data/alert.rules /var/lib/docker/volumes/${PROJECT}_prometheus-config/_data/prometheus.yml
-            envsubst '${PROJECT}' < prometheus/alert.rules > /var/lib/docker/volumes/${PROJECT}_prometheus-config/_data/alert.rules
-            envsubst < prometheus/prometheus.yml > /var/lib/docker/volumes/${PROJECT}_prometheus-config/_data/prometheus.yml
-            
-            # Grafana Config
-            rm -rf /var/lib/docker/volumes/${PROJECT}_grafana-provisioning/_data/*
-            cp -R grafana/dashboards/ grafana/datasources/ /var/lib/docker/volumes/${PROJECT}_grafana-provisioning/_data
-            envsubst < grafana/dashboards/indexing-performance-metrics.json > /var/lib/docker/volumes/${PROJECT}_grafana-provisioning/_data/dashboards/indexing-performance-metrics.json
-            
-            COMPOSE_FILE=$COMPOSE_FILE COMPOSE_PROFILES=$COMPOSE_PROFILES docker compose --env-file .env.$1 up -d --force-recreate --build
-
-            for node in "${CHAIN_NAME[@]}"
-            do
-            if [ $node == 'mainnet' ]; then 
-                node=ethereum 
-            fi
-            if [ "$(docker network ls -f name=$node -q)" ]; then
-                docker network connect $node ${COMPOSE_PROJECT_NAME}-index-node
-                docker network connect $node ${COMPOSE_PROJECT_NAME}-query-node
-            fi
-            done
+        *)
+            echo "Starting graph ALL"
+            COMPOSE_FILE=$GRAPH_DIR/services/node.yml:$GRAPH_DIR/services/indexer.yml:$GRAPH_DIR/services/monitor.yml \
+            COMPOSE_PROFILES=$COMPOSE_PROFILES \
+            docker compose --env-file $GRAPH_DIR/.env.$1 up -d --force-recreate --build
             ;;
     esac
+
+    unset PROJECT
 }
 
 graph-stop() {
-    source .env.$1
-
+    source $GRAPH_DIR/.env.$1
     if $AUTOAGORA; then 
-        COMPOSE_FILE=services/graph-setup.yml:services/autoagora.yml
         COMPOSE_PROFILES=autoagora
     else
-        COMPOSE_FILE=services/graph-setup.yml
         COMPOSE_PROFILES=no-autoagora
     fi
 
     case $2 in
         "node")
-            COMPOSE_FILE=$COMPOSE_FILE COMPOSE_PROFILES=$COMPOSE_PROFILES docker compose --env-file .env.$1 stop index-node query-node
+            echo "Stopping graph NODE"
+            COMPOSE_FILE=$GRAPH_DIR/services/node.yml docker compose --env-file $GRAPH_DIR/.env.$1 stop
             ;;
         "indexer")
-            COMPOSE_FILE=$COMPOSE_FILE COMPOSE_PROFILES=$COMPOSE_PROFILES docker compose --env-file .env.$1 stop indexer-agent indexer-cli indexer-service
+            echo "Stopping graph INDEXER"
+            COMPOSE_FILE=$GRAPH_DIR/services/indexer.yml COMPOSE_PROFILES=$COMPOSE_PROFILES docker compose --env-file $GRAPH_DIR/.env.$1 stop
             ;;
         "monitor")
-            COMPOSE_FILE=$COMPOSE_FILE COMPOSE_PROFILES=$COMPOSE_PROFILES docker compose --env-file .env.$1 stop grafana prometheus
+            echo "Stopping graph MONITOR"
+            COMPOSE_FILE=$GRAPH_DIR/services/monitor.yml docker compose --env-file $GRAPH_DIR/.env.$1 stop
+            ;;
+        *)
+            echo "Stopping graph ALL"
+            tmux kill-session -t $1
+            COMPOSE_FILE=$GRAPH_DIR/services/node.yml:$GRAPH_DIR/services/indexer.yml:$GRAPH_DIR/services/monitor.yml \
+            COMPOSE_PROFILES=$COMPOSE_PROFILES \
+            docker compose --env-file $GRAPH_DIR/.env.$1 stop
             ;;
     esac
 }
 
+graph-connect() {
+    if [ -z "$1" ] || [ -z "$2" ]; then
+        echo "Define 1. indexer name and 2. proxy service" >&2
+        exit 1
+    fi
+
+    # Attach proxy to indexer network
+    for net in $(docker container inspect --format '{{range $net,$v := .NetworkSettings.Networks}}{{printf "%s\n" $net}}{{end}}' ${2}-proxy)
+    do
+      if [ "$net" = ${1}-indexer ]; then
+        echo "Proxy already connected" >&2
+        return
+      fi
+    done
+
+    docker network connect ${1}-indexer ${2}-proxy
+}
+
+graph-disconnect() {
+    if [ -z "$1" ] || [ -z "$2" ]; then
+        echo "Define 1. indexer name and 2. proxy service" >&2
+        exit 1
+    fi
+
+    # Attach proxy to indexer network
+    for net in $(docker container inspect --format '{{range $net,$v := .NetworkSettings.Networks}}{{printf "%s\n" $net}}{{end}}' ${2}-proxy)
+    do
+      if [ "$net" = ${1}-indexer ]; then
+        docker network disconnect ${1}-indexer ${2}-proxy
+        return
+      fi
+    done
+
+    echo "Proxy not connected" >&2
+}
+
 graph-monitor() {
+    # check if container running
+    if [ -z "$( docker ps | grep $1-indexer-cli )" ]; then
+        echo "Project not found."
+        return
+    fi
+
     # Check if session name exists
     SESSIONEXISTS=$(tmux list-sessions | grep $1)
 
     # Set up monitoring interface
-    if [ "$SESSIONEXISTS" = "" ]
+    if [ "$SESSIONEXISTS" = "" ];
     then
         # Create new session
         tmux new-session -d -s $1

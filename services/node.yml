@@ -1,0 +1,126 @@
+version: '3.9'
+
+x-logging:
+  &default-logging
+  options:
+    max-file: '1'
+    compress: 'false'
+  driver: local
+
+volumes:
+  db-node:
+  db-socket:
+  node-config:
+    external: true
+    name: ${COMPOSE_PROJECT_NAME}_node-config
+
+networks:
+  indexer:
+    name: ${COMPOSE_PROJECT_NAME}-indexer
+    external: true
+
+services:
+# INDEX NODE
+  index-node:
+    image: graphprotocol/graph-node:${NODE_VERSION}
+    container_name: ${COMPOSE_PROJECT_NAME}-index-node
+    networks:
+      - indexer
+    expose:
+      - 8000
+      - 8001
+      - 8030
+      - 8040
+    depends_on:
+      - postgres-node
+    environment:
+      node_role: index-node
+      node_id: index_node
+      postgres_host: ${COMPOSE_PROJECT_NAME}-postgres-node
+      postgres_user: ${DB_NODE_USER}
+      postgres_pass: ${DB_NODE_PASS}
+      postgres_db: ${DB_NODE_NAME}
+      ipfs: https://ipfs.network.thegraph.com/ipfs/
+      # ethereum: ${CHAIN_RPC}
+      GRAPH_NODE_CONFIG: /root/node-config/config.toml
+      GRAPH_LOG: DEBUG
+      RUST_LOG: INFO
+      # GRAPH_ETH_CALL_GAS: 50000000
+      GRAPH_GETH_ETH_CALL_ERRORS: "out of gas"
+      GRAPH_MAX_GAS_PER_HANDLER: 1000000000000000
+      ETHEREUM_TRACE_STREAM_STEP_SIZE: 50
+      ETHEREUM_BLOCK_BATCH_SIZE: 10
+      # ETHEREUM_RPC_MAX_PARALLEL_REQUESTS: 64
+      GRAPH_ETHEREUM_MAX_BLOCK_RANGE_SIZE: 2000
+      GRAPH_ETHEREUM_TARGET_TRIGGERS_PER_BLOCK_RANGE: 100
+      GRAPH_KILL_IF_UNRESPONSIVE: true
+      GRAPH_ALLOW_NON_DETERMINISTIC_FULLTEXT_SEARCH: true
+      EXPERIMENTAL_SUBGRAPH_VERSION_SWITCHING_MODE: synced
+      BLOCK_INGESTOR: index_node
+      ETHEREUM_POLLING_INTERVAL: 500
+      GRAPH_ETH_CALL_NO_GAS: 421613,42161
+    volumes:
+      - db-socket:/var/run/postgresql
+      - node-config:/root/node-config/
+    restart: unless-stopped
+    logging: *default-logging
+
+# QUERY NODE
+  query-node:
+    image: graphprotocol/graph-node:${NODE_VERSION}
+    container_name: ${COMPOSE_PROJECT_NAME}-query-node
+    networks:
+      - indexer
+    expose:
+      - 8000
+      - 8001
+      - 8020
+      - 8030
+      - 8040
+    depends_on:
+      - postgres-node
+    environment:
+      node_role: query-node
+      node_id: query_node
+      postgres_host: ${COMPOSE_PROJECT_NAME}-postgres-node
+      postgres_user: ${DB_NODE_USER}
+      postgres_pass: ${DB_NODE_PASS}
+      postgres_db: ${DB_NODE_NAME}
+      ipfs: https://ipfs.network.thegraph.com/ipfs/
+      # ethereum: ${CHAIN_RPC}
+      GRAPH_NODE_CONFIG: /root/node-config/config.toml
+      GRAPH_LOG: DEBUG
+      RUST_LOG: INFO
+      # GRAPH_ETH_CALL_GAS: 50000000
+      GRAPH_GETH_ETH_CALL_ERRORS: "out of gas"
+      GRAPH_MAX_GAS_PER_HANDLER: 1000000000000000
+      # GRAPH_LOG_QUERY_TIMING: gql
+      EXPERIMENTAL_SUBGRAPH_VERSION_SWITCHING_MODE: synced
+      GRAPH_KILL_IF_UNRESPONSIVE: true
+      GRAPH_ALLOW_NON_DETERMINISTIC_FULLTEXT_SEARCH: true
+    volumes:
+      - db-socket:/var/run/postgresql
+      - node-config:/root/node-config/
+    restart: unless-stopped
+    logging:
+        driver: "journald"
+
+# NODE DATABASE
+  postgres-node:
+    image: postgres:${DB_NODE_VERSION}
+    container_name: ${COMPOSE_PROJECT_NAME}-postgres-node
+    networks:
+      - indexer
+    expose:
+      - 5432
+    command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements"]
+    environment:
+      POSTGRES_USER: ${DB_NODE_USER}
+      POSTGRES_PASSWORD: ${DB_NODE_PASS}
+      POSTGRES_DB: ${DB_NODE_NAME}
+      POSTGRES_INITDB_ARGS: "-E UTF8 --locale=C"
+    volumes:
+      - db-node:/var/lib/postgresql/data
+      - db-socket:/var/run/postgresql
+    restart: unless-stopped
+    logging: *default-logging

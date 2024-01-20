@@ -18,4 +18,5 @@ RUN ln -s /root/.npm-global/lib/node_modules/@graphprotocol/indexer-cli/packages
 RUN mkdir -p "/root/.config/graph-cli/"
 ARG PROJECT
 RUN echo "api = \"http://$PROJECT-indexer-agent:8000/\"" >> "/root/.config/graph-cli/indexing.toml"
+RUN echo "export PROMPT_COMMAND='history -a' && export HISTFILE=/history/.bash_history" >> "/root/.bashrc"
 WORKDIR /root/

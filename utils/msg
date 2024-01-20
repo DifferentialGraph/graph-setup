@@ -1,0 +1,7 @@
+#!/bin/bash
+
+error() {
+	# Log to stderr and exit with failure.
+	printf "%s\n" "$1" >&2
+	return
+}

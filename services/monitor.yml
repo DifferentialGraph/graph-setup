@@ -1,0 +1,151 @@
+version: '3.9'
+
+x-logging:
+  &default-logging
+  options:
+    max-file: '1'
+    compress: 'false'
+  driver: local
+
+volumes:
+  prometheus:
+  prometheus-config:
+    external: true
+    name: ${COMPOSE_PROJECT_NAME}_prometheus-config
+  grafana:
+  grafana-provisioning:
+    external: true
+    name: ${COMPOSE_PROJECT_NAME}_grafana-provisioning
+  alertmanager-config:
+    external: true
+    name: ${COMPOSE_PROJECT_NAME}_alertmanager-config
+  alertmanager-data:
+
+networks:
+  indexer:
+    name: ${COMPOSE_PROJECT_NAME}-indexer
+    external: true
+
+services:
+# PROMETHEUS
+  prometheus:
+    image: prom/prometheus
+    container_name: ${COMPOSE_PROJECT_NAME}-prometheus
+    networks:
+      - indexer
+    environment:
+      PROJECT: ${COMPOSE_PROJECT_NAME}
+      VIRTUAL_HOST: ${PROMETHEUS_HOST}
+      VIRTUAL_PORT: 9090
+      LETSENCRYPT_HOST: ${PROMETHEUS_HOST}
+    volumes:
+      - prometheus-config:/etc/prometheus
+      - prometheus:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    expose:
+      - 9090
+    restart: unless-stopped
+    logging: *default-logging
+
+# GRAFANA
+  grafana:
+    image: grafana/grafana
+    container_name: ${COMPOSE_PROJECT_NAME}-grafana
+    networks:
+      - indexer
+    # depends_on:
+    #   - postgres-node
+    volumes:
+      - grafana:/var/lib/grafana
+      - grafana-provisioning:/etc/grafana/provisioning
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASS}
+      GF_USERS_ALLOW_SIGN_UP: false
+      GF_SECURITY_DISABLE_BRUTE_FORCE_LOGIN_PROTECTION: true
+      GF_INSTALL_PLUGINS: fifemon-graphql-datasource
+      PROJECT: ${COMPOSE_PROJECT_NAME}
+      POSTGRES_HOST: ${COMPOSE_PROJECT_NAME}-postgres-node
+      POSTGRES_USER: ${DB_NODE_USER}
+      POSTGRES_PASS: ${DB_NODE_PASS}
+      POSTGRES_DB: ${DB_NODE_NAME}
+      SUBGRAPH_ENDPOINT: ${NETWORK_SUBGRAPH_ENDPOINT}
+      PROMETHEUS_HOST: ${COMPOSE_PROJECT_NAME}-prometheus
+      VIRTUAL_HOST: ${GRAFANA_HOST}
+      VIRTUAL_PORT: 3000
+      LETSENCRYPT_HOST: ${GRAFANA_HOST}
+    expose:
+      - 3000
+    restart: unless-stopped
+    logging: *default-logging
+
+# ALERT MANAGER
+  alertmanager:
+    image: prom/alertmanager
+    container_name: ${COMPOSE_PROJECT_NAME}-alertmanager
+    networks:
+      - indexer
+    volumes:
+      - alertmanager-config:/etc/alertmanager
+      - alertmanager-data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/config.yml'
+      - '--storage.path=/alertmanager'
+    expose:
+      - 9093
+    restart: unless-stopped
+    logging: *default-logging
+
+# NODE EXPORTER
+  node-exporter:
+    image: prom/node-exporter
+    container_name: ${COMPOSE_PROJECT_NAME}-node-exporter
+    networks:
+      - indexer
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
+    expose:
+      - 9100
+    restart: unless-stopped
+    logging: *default-logging
+
+# CADVISOR
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor
+    container_name: ${COMPOSE_PROJECT_NAME}-cadvisor
+    networks:
+      - indexer
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /cgroup:/cgroup:ro #doesn't work on MacOS only for Linux
+    expose:
+      - 8080
+    restart: unless-stopped
+    logging: *default-logging
+
+# PUSHGATEWAY
+  pushgateway:
+    image: prom/pushgateway
+    container_name: ${COMPOSE_PROJECT_NAME}-pushgateway
+    networks:
+      - indexer
+    expose:
+      - 9091
+    restart: unless-stopped
+    logging: *default-logging

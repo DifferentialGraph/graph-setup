@@ -1,0 +1,63 @@
+#!/bin/bash
+source utils/msg
+source utils/configure
+source utils/docker
+source utils/manage
+
+# export to .bashrc if needed
+if ! grep -q "#graph-setup" ~/.bashrc; then
+  echo "Modifying .bashrc ..."
+  DIR="$( cd "$( dirname -- $0 )" && pwd )"
+  echo -e "\n" >> ~/.bashrc
+  echo "#graph-setup" >> ~/.bashrc
+  echo "export GRAPH_DIR=$DIR" >> ~/.bashrc
+  echo 'source $GRAPH_DIR/utils/managev2' >> ~/.bashrc
+  source ~/.bashrc
+fi
+
+# Check if project name is defined
+if [ -z "$1" ]; then
+  echo "No project defined" >&2
+  exit 1
+fi
+
+# Check if the network is defined
+if [ -z "$2" ]; then
+  echo "No network defined" >&2
+  exit 1
+fi
+
+# Install requirements
+install-required || error "Could not install required."
+
+# Generate configurartion file if not existing
+if [ ! -f .env.$1 ]; then
+  generate-project-env $1 $2 || error "Could not generate environment file."
+fi
+source .env.$1
+
+# create indexer network
+docker network create $1-indexer || true
+
+# start node
+graph-start $1 node
+
+# start indexer
+graph-start $1 indexer
+
+# start monitor
+graph-start $1 monitor
+
+# connect to reverse proxy
+if [ "$( docker container inspect -f '{{.State.Status}}' $PROXY-proxy )" == "running" ]; then
+  if [ $PROXY == "nginx" ]; then
+    htpasswd -c -b /var/lib/docker/volumes/nginx_htpasswd/_data/prometheus-$1.$HOST $PROMETHEUS_USER $PROMETHEUS_PASS
+  fi
+  graph-connect $1 $PROXY
+else
+  echo "$PROXY-proxy not running."
+fi
+
+# Populate with subgraph sizes for grafana
+sleep 5
+docker exec -it $1-postgres-node psql -U ${DB_NODE_USER} ${DB_NODE_NAME} -c "refresh materialized view info.subgraph_sizes;"

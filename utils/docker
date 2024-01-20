@@ -1,0 +1,89 @@
+#!/bin/bash
+
+container-list() {
+    if [ -z "$1" ]
+    then
+        docker ps -a -q
+    else
+        docker ps -a -q --filter name=$1
+    fi
+}
+
+container-status() {
+    docker container inspect -f '{{.State.Status}}' $1
+}
+
+container-log() {
+    docker logs $1 --tail 10 -f
+}
+
+container-start() {
+    if [ -z "$1" ]
+    then
+        docker start $(docker ps -a -q)
+    else
+        docker start $(docker ps -a -q --filter name=$1)
+    fi
+}
+
+container-stop() {
+    if [ -z "$1" ]
+    then
+        docker stop $(docker ps -a -q)
+    else
+        docker stop $(docker ps -a -q --filter name=$1)
+    fi
+}
+
+container-remove() {
+    if [ -z "$1" ]
+    then
+        docker rm $(docker ps -a -q)
+    else
+        docker rm $(docker ps -a -q --filter name=$1)
+    fi
+}
+
+container-running()
+{
+    if [ "$( docker container inspect -f '{{.State.Running}}' $1 )" = "true" ]; then
+        return true
+    else
+        return false
+    fi
+}
+
+container-networks() {
+    docker container inspect --format '{{range $net,$v := .NetworkSettings.Networks}}{{printf "%s\n" $net}}{{end}}' $1
+}
+
+container-shell() {
+    docker exec -it ${1} /bin/bash
+}
+
+volume-list() {
+    if [ -z "$1" ]
+    then
+        docker volume ls
+    else
+        docker volume ls -f name=$1
+    fi
+}
+
+volume-remove() {
+    if [ -z "$1" ]
+    then
+        docker volume rm $(docker volume ls -q)
+    else
+        docker volume rm $(docker volume ls -q -f name=$1)
+    fi
+}
+
+volume-exists() {
+    if [ "$(docker volume ls -f name=$1 | awk '{print $NF}' | grep -E '^'$1'$')" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+

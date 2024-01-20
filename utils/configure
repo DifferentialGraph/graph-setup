@@ -1,6 +1,7 @@
 #!/bin/bash
 
-base-config()
+# install required packages (ubuntu)
+install-required()
 {
     apt update && apt -y install ca-certificates curl gnupg grep apache2-utils npm
 
@@ -14,10 +15,13 @@ base-config()
         apt update && apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin docker-compose
     fi
 
-    npm install -g pino-pretty
+    if [ `npm list -g | grep -c pino-pretty` -eq 0 ]; then
+        npm install -g pino-pretty
+    fi
 }
 
-generate-node-config() 
+# generate configuration file for graph-node
+generate-node-config()
 {
 # Datbase
 cat <<EOF >$1
@@ -51,4 +55,61 @@ indexers = [ "index_node" ]
 [general]
 query = "query_node"
 EOF
+}
+
+# generate project env file
+# 1. project name
+# 2. operating network
+generate-project-env()
+{
+    # Load user configuration file
+    source .env.user
+
+    # Set project variables
+    echo "COMPOSE_PROJECT_NAME=$1" > .env.$1
+
+    # Hosts
+    echo "INDEX_HOST=index-$1.$HOST" >> .env.$1
+    echo "GRAFANA_HOST=dashboard-$1.$HOST" >> .env.$1
+    echo "PROMETHEUS_HOST=prometheus-$1.$HOST" >> .env.$1
+
+    if [ "$2" = "mainnet" ]; then
+        echo "TXN_RPC=$TXN_RPC_MAINNET" >> .env.$1
+        echo "ETHEREUM_NETWORK="mainnet"" >> .env.$1
+        echo "NETWORK_SUBGRAPH_ENDPOINT="https://api.thegraph.com/subgraphs/name/graphprotocol/graph-network-mainnet"" >> .env.$1
+        echo "DAI_CONTRACT="0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"" >> .env.$1
+        echo "COLLECT_RECEIPTS_ENDPOINT="https://gateway.network.thegraph.com/collect-receipts"" >> .env.$1
+        echo "EPOCH_SUBGRAPH_ENDPOINT="https://api.thegraph.com/subgraphs/name/graphprotocol/mainnet-epoch-block-oracle"" >> .env.$1
+        echo "CLIENT_SIGNER_ADDRESS="0x982D10c56b8BBbD6e09048F5c5f01b43C65D5aE0"" >> .env.$1
+    elif [ "$2" = "goerli" ]; then
+        echo "TXN_RPC=$TXN_RPC_GOERLI" >> .env.$1
+        echo "ETHEREUM_NETWORK="goerli"" >> .env.$1
+        echo "NETWORK_SUBGRAPH_ENDPOINT="https://api.thegraph.com/subgraphs/name/graphprotocol/graph-network-goerli"" >> .env.$1
+        echo "DAI_CONTRACT="0x9e7e607afd22906f7da6f1ec8f432d6f244278be"" >> .env.$1
+        echo "COLLECT_RECEIPTS_ENDPOINT="https://gateway.testnet.thegraph.com/collect-receipts"" >> .env.$1
+        echo "EPOCH_SUBGRAPH_ENDPOINT="https://api.thegraph.com/subgraphs/name/graphprotocol/goerli-epoch-block-oracle"" >> .env.$1
+        echo "CLIENT_SIGNER_ADDRESS="0xe1EC4339019eC9628438F8755f847e3023e4ff9c"" >> .env.$1
+    elif [ "$2" = "arbitrum-one" ]; then
+        echo "TXN_RPC=$TXN_RPC_ARBITRUM" >> .env.$1
+        echo "ETHEREUM_NETWORK="arbitrum-one"" >> .env.$1
+        echo "NETWORK_SUBGRAPH_ENDPOINT="https://api.thegraph.com/subgraphs/name/graphprotocol/graph-network-arbitrum"" >> .env.$1
+        echo "DAI_CONTRACT="0x11fE4B6AE13d2a6055C8D9cF65c55bac32B5d844"" >> .env.$1
+        echo "COLLECT_RECEIPTS_ENDPOINT="https://gateway-arbitrum.network.thegraph.com/collect-receipts"" >> .env.$1
+        echo "EPOCH_SUBGRAPH_ENDPOINT="https://api.thegraph.com/subgraphs/name/graphprotocol/arbitrum-epoch-block-oracle"" >> .env.$1
+        echo "CLIENT_SIGNER_ADDRESS="0xc483960d4D58eabc434Dc88a620AdFd883D6Dd4e"" >> .env.$1
+    elif [ "$2" = "arbitrum-goerli" ]; then
+        echo "TXN_RPC=$TXN_RPC_ARBITRUM_GOERLI" >> .env.$1
+        echo "ETHEREUM_NETWORK="goerli"" >> .env.$1
+        echo "NETWORK_SUBGRAPH_ENDPOINT="https://api.thegraph.com/subgraphs/name/graphprotocol/graph-network-arbitrum-goerli"" >> .env.$1
+        echo "DAI_CONTRACT="0x11fE4B6AE13d2a6055C8D9cF65c55bac32B5d844"" >> .env.$1
+        echo "COLLECT_RECEIPTS_ENDPOINT="https://gateway-testnet-arbitrum.network.thegraph.com/collect-receipts"" >> .env.$1
+        echo "EPOCH_SUBGRAPH_ENDPOINT="https://api.thegraph.com/subgraphs/name/graphprotocol/arb-goerli-epoch-block-oracle"" >> .env.$1
+        echo "CLIENT_SIGNER_ADDRESS="0xac01B0b3B2Dc5D8E0D484c02c4d077C15C96a7b4"" >> .env.$1
+    else
+        echo "Error: network not found." >&2
+        exit 1
+    fi
+
+    # Project configuration file
+    cat .env.user >> .env.$1
 }

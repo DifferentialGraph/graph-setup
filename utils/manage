@@ -63,8 +63,8 @@ graph-start() {
             else
                 rm -rf /var/lib/docker/volumes/${PROJECT}_prometheus-config/_data/alert.rules /var/lib/docker/volumes/${PROJECT}_prometheus-config/_data/prometheus.yml
             fi
-            envsubst '${PROJECT}' < prometheus/alert.rules > /var/lib/docker/volumes/${PROJECT}_prometheus-config/_data/alert.rules
-            envsubst < prometheus/prometheus.yml > /var/lib/docker/volumes/${PROJECT}_prometheus-config/_data/prometheus.yml
+            envsubst '${PROJECT}' < $GRAPH_DIR/prometheus/alert.rules > /var/lib/docker/volumes/${PROJECT}_prometheus-config/_data/alert.rules
+            envsubst < $GRAPH_DIR/prometheus/prometheus.yml > /var/lib/docker/volumes/${PROJECT}_prometheus-config/_data/prometheus.yml
             
             # Grafana
             if ! volume-exists ${PROJECT}_grafana-provisioning; then
@@ -72,13 +72,13 @@ graph-start() {
             else
                 rm -rf /var/lib/docker/volumes/${PROJECT}_grafana-provisioning/_data/*
             fi
-            cp -R grafana/dashboards/ grafana/datasources/ /var/lib/docker/volumes/${PROJECT}_grafana-provisioning/_data
-            envsubst < grafana/dashboards/indexing-performance-metrics.json > /var/lib/docker/volumes/${PROJECT}_grafana-provisioning/_data/dashboards/indexing-performance-metrics.json
+            cp -R $GRAPH_DIR/grafana/dashboards/ $GRAPH_DIR/grafana/datasources/ /var/lib/docker/volumes/${PROJECT}_grafana-provisioning/_data
+            envsubst < $GRAPH_DIR/grafana/dashboards/indexing-performance-metrics.json > /var/lib/docker/volumes/${PROJECT}_grafana-provisioning/_data/dashboards/indexing-performance-metrics.json
             
             # Alertmanager
             if ! volume-exists ${PROJECT}_alertmanager-config; then
                 docker volume create ${PROJECT}_alertmanager-config
-                cp alertmanager/config.yml /var/lib/docker/volumes/${PROJECT}_alertmanager-config/_data
+                cp $GRAPH_DIR/alertmanager/config.yml /var/lib/docker/volumes/${PROJECT}_alertmanager-config/_data
             fi
 
             COMPOSE_FILE=$GRAPH_DIR/services/monitor.yml \

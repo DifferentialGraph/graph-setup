@@ -107,7 +107,13 @@ services:
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
-      - /:/rootfs:ro
+      # - /:/rootfs:ro
+      - type: bind
+        source: /
+        target: /rootfs
+        read_only: true
+        bind:
+          propagation: rslave      
     command:
       - '--path.procfs=/host/proc'
       - '--path.rootfs=/rootfs'
@@ -124,10 +130,22 @@ services:
     networks:
       - indexer-monitor
     volumes:
-      - /:/rootfs:ro
+      # - /:/rootfs:ro
+      - type: bind
+        source: /
+        target: /rootfs
+        read_only: true
+        bind:
+          propagation: rslave      
       - /var/run:/var/run:rw
       - /sys:/sys:ro
-      - /var/lib/docker:/var/lib/docker:ro
+      # - /var/lib/docker:/var/lib/docker:ro
+      - type: bind
+        source: /var/lib/docker/
+        target: /var/lib/docker
+        read_only: true
+        bind:
+          propagation: rslave
       - /cgroup:/cgroup:ro #doesn't work on MacOS only for Linux
     expose:
       - 8080

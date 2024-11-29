@@ -150,6 +150,7 @@ services:
   postgres-indexer:
     image: postgres:${DB_INDEXER_VERSION}
     container_name: ${INDEXER_NAME}-postgres-indexer
+    shm_size: 1gb
     networks:
       - indexer
     expose:

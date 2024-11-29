@@ -70,7 +70,7 @@ services:
     networks:
       - graph-node
     ports:
-      - 127.0.0.1:8000:8000
+      - 127.0.0.1:8000:8000 # port to query subgraphs
     expose:
       # - 8000
       - 8001
@@ -110,6 +110,12 @@ services:
           "/ws":
             port: 8001
             dest: "/subgraphs/id/QmSWxvd8SaQK6qZKJ7xtfxCCGoRzGnoi2WNzmJYYJW9BXY"
+          "/epoch":
+            port: 8000
+            dest: "/subgraphs/id/QmQEGDTb3xeykCXLdWx7pPX3qeeGMUvHmGWP4SpMkv5QJf"
+          "/epoch/ws":
+            port: 8001
+            dest: "/subgraphs/id/QmQEGDTb3xeykCXLdWx7pPX3qeeGMUvHmGWP4SpMkv5QJf"
 
     volumes:
       - db-socket:/var/run/postgresql
@@ -121,6 +127,7 @@ services:
   postgres-node:
     image: postgres:${DB_NODE_VERSION}
     container_name: postgres-node
+    shm_size: 1gb
     networks:
       - graph-node
     ports:

@@ -1,5 +1,3 @@
-version: '3.9'
-
 x-logging:
   &default-logging
   options:
@@ -9,32 +7,33 @@ x-logging:
 
 volumes:
   prometheus:
+    name: ${INDEXER_NAME}-monitor_prometheus
   prometheus-config:
     external: true
-    name: ${COMPOSE_PROJECT_NAME}_prometheus-config
+    name: ${INDEXER_NAME}-monitor_prometheus-config
   grafana:
+    name: ${INDEXER_NAME}-monitor_grafana
   grafana-provisioning:
     external: true
-    name: ${COMPOSE_PROJECT_NAME}_grafana-provisioning
+    name: ${INDEXER_NAME}-monitor_grafana-provisioning
   alertmanager-config:
     external: true
-    name: ${COMPOSE_PROJECT_NAME}_alertmanager-config
+    name: ${INDEXER_NAME}-monitor_alertmanager-config
   alertmanager-data:
+    name: ${INDEXER_NAME}-monitor_alertmanager-data
 
 networks:
-  indexer:
-    name: ${COMPOSE_PROJECT_NAME}-indexer
-    external: true
+  indexer-monitor:
+    name: ${INDEXER_NAME}-monitor
 
 services:
-# PROMETHEUS
   prometheus:
     image: prom/prometheus
-    container_name: ${COMPOSE_PROJECT_NAME}-prometheus
+    container_name: ${INDEXER_NAME}-monitor-prometheus
     networks:
-      - indexer
+      - indexer-monitor
     environment:
-      PROJECT: ${COMPOSE_PROJECT_NAME}
+      PROJECT: ${INDEXER_NAME}-monitor
       VIRTUAL_HOST: ${PROMETHEUS_HOST}
       VIRTUAL_PORT: 9090
       LETSENCRYPT_HOST: ${PROMETHEUS_HOST}
@@ -48,17 +47,18 @@ services:
       - '--web.console.templates=/etc/prometheus/consoles'
       - '--storage.tsdb.retention.time=200h'
       - '--web.enable-lifecycle'
-    expose:
-      - 9090
+    # expose:
+    #   - 9090
+    ports:
+      - 127.0.0.1:9090:9090 # exposing internally metric port for monitoring
     restart: unless-stopped
     logging: *default-logging
 
-# GRAFANA
   grafana:
     image: grafana/grafana
-    container_name: ${COMPOSE_PROJECT_NAME}-grafana
+    container_name: ${INDEXER_NAME}-monitor-grafana
     networks:
-      - indexer
+      - indexer-monitor
     # depends_on:
     #   - postgres-node
     volumes:
@@ -70,13 +70,13 @@ services:
       GF_USERS_ALLOW_SIGN_UP: false
       GF_SECURITY_DISABLE_BRUTE_FORCE_LOGIN_PROTECTION: true
       GF_INSTALL_PLUGINS: fifemon-graphql-datasource
-      PROJECT: ${COMPOSE_PROJECT_NAME}
-      POSTGRES_HOST: ${COMPOSE_PROJECT_NAME}-postgres-node
+      PROJECT: ${INDEXER_NAME}-monitor
+      POSTGRES_HOST: postgres-node
       POSTGRES_USER: ${DB_NODE_USER}
       POSTGRES_PASS: ${DB_NODE_PASS}
       POSTGRES_DB: ${DB_NODE_NAME}
       SUBGRAPH_ENDPOINT: ${NETWORK_SUBGRAPH_ENDPOINT}
-      PROMETHEUS_HOST: ${COMPOSE_PROJECT_NAME}-prometheus
+      PROMETHEUS_HOST: ${INDEXER_NAME}-monitor-prometheus
       VIRTUAL_HOST: ${GRAFANA_HOST}
       VIRTUAL_PORT: 3000
       LETSENCRYPT_HOST: ${GRAFANA_HOST}
@@ -85,12 +85,11 @@ services:
     restart: unless-stopped
     logging: *default-logging
 
-# ALERT MANAGER
   alertmanager:
     image: prom/alertmanager
-    container_name: ${COMPOSE_PROJECT_NAME}-alertmanager
+    container_name: ${INDEXER_NAME}-monitor-alertmanager
     networks:
-      - indexer
+      - indexer-monitor
     volumes:
       - alertmanager-config:/etc/alertmanager
       - alertmanager-data:/alertmanager
@@ -102,16 +101,21 @@ services:
     restart: unless-stopped
     logging: *default-logging
 
-# NODE EXPORTER
   node-exporter:
     image: prom/node-exporter
-    container_name: ${COMPOSE_PROJECT_NAME}-node-exporter
+    container_name: ${INDEXER_NAME}-monitor-node-exporter
     networks:
-      - indexer
+      - indexer-monitor
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
-      - /:/rootfs:ro
+      # - /:/rootfs:ro
+      - type: bind
+        source: /
+        target: /rootfs
+        read_only: true
+        bind:
+          propagation: rslave      
     command:
       - '--path.procfs=/host/proc'
       - '--path.rootfs=/rootfs'
@@ -122,29 +126,39 @@ services:
     restart: unless-stopped
     logging: *default-logging
 
-# CADVISOR
   cadvisor:
     image: gcr.io/cadvisor/cadvisor
-    container_name: ${COMPOSE_PROJECT_NAME}-cadvisor
+    container_name: ${INDEXER_NAME}-monitor-cadvisor
     networks:
-      - indexer
+      - indexer-monitor
     volumes:
-      - /:/rootfs:ro
+      # - /:/rootfs:ro
+      - type: bind
+        source: /
+        target: /rootfs
+        read_only: true
+        bind:
+          propagation: rslave      
       - /var/run:/var/run:rw
       - /sys:/sys:ro
-      - /var/lib/docker:/var/lib/docker:ro
+      # - /var/lib/docker:/var/lib/docker:ro
+      - type: bind
+        source: /var/lib/docker/
+        target: /var/lib/docker
+        read_only: true
+        bind:
+          propagation: rslave
       - /cgroup:/cgroup:ro #doesn't work on MacOS only for Linux
     expose:
       - 8080
     restart: unless-stopped
     logging: *default-logging
 
-# PUSHGATEWAY
   pushgateway:
     image: prom/pushgateway
-    container_name: ${COMPOSE_PROJECT_NAME}-pushgateway
+    container_name: ${INDEXER_NAME}-monitor-pushgateway
     networks:
-      - indexer
+      - indexer-monitor
     expose:
       - 9091
     restart: unless-stopped

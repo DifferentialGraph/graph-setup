@@ -317,7 +317,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "abs(deployment_head{instance=\"${PROJECT}-index-node:8040\"} - on (network) group_left ethereum_chain_head_number{instance=\"${PROJECT}-index-node:8040\"})",
+          "expr": "abs(deployment_head{instance=\"index-node:8040\"} - on (network) group_left ethereum_chain_head_number{instance=\"index-node:8040\"})",
           "format": "time_series",
           "instant": false,
           "interval": "",

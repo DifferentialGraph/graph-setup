@@ -42,7 +42,7 @@ groups:
 - name: containers
   rules:
   - alert: querynode_down
-    expr: absent((time() - container_last_seen{name=~"${PROJECT}-query-node.*"}) < 10)
+    expr: absent((time() - container_last_seen{name=~"query-node.*"}) < 10)
     for: 30s
     labels:
       severity: critical
@@ -51,7 +51,7 @@ groups:
       description: "{{ $labels.instance }} container is down for more than 30 seconds."
 
   - alert: querynode_high_cpu
-    expr: sum(rate(container_cpu_usage_seconds_total{name=~"${PROJECT}-query-node.*"}[1m])) / count(node_cpu_seconds_total{mode="system"}) * 100 > 10
+    expr: sum(rate(container_cpu_usage_seconds_total{name=~"query-node.*"}[1m])) / count(node_cpu_seconds_total{mode="system"}) * 100 > 10
     for: 30s
     labels:
       severity: warning
@@ -60,7 +60,7 @@ groups:
       description: "Query Node {{ $labels.instance }} CPU usage is {{ humanize $value}}%."
 
   - alert: querynode_high_memory
-    expr: sum(container_memory_usage_bytes{name=~"${PROJECT}-query-node.*"}) > 1200000000
+    expr: sum(container_memory_usage_bytes{name=~"query-node.*"}) > 1200000000
     for: 30s
     labels:
       severity: warning
@@ -69,7 +69,7 @@ groups:
       description: "Query Node {{ $labels.instance }} memory consumption is at {{ humanize $value}}."
 
   - alert: indexnode_down
-    expr: absent((time() - container_last_seen{name=~"${PROJECT}-index-node.*"}) < 10)
+    expr: absent((time() - container_last_seen{name=~"index-node.*"}) < 10)
     for: 30s
     labels:
       severity: critical
@@ -78,7 +78,7 @@ groups:
       description: "{{ $labels.instance }} container is down for more than 30 seconds."
 
   - alert: indexnode_high_cpu
-    expr: sum(rate(container_cpu_usage_seconds_total{name=~"${PROJECT}-index-node.*"}[1m])) / count(node_cpu_seconds_total{mode="system"}) * 100 > 10
+    expr: sum(rate(container_cpu_usage_seconds_total{name=~"index-node.*"}[1m])) / count(node_cpu_seconds_total{mode="system"}) * 100 > 10
     for: 30s
     labels:
       severity: warning
@@ -87,7 +87,7 @@ groups:
       description: "{{ $labels.instance }} node CPU usage is {{ humanize $value}}%."
 
   - alert: indexnode_high_memory
-    expr: sum(container_memory_usage_bytes{name=~"${PROJECT}-query-node.*"}) > 1200000000
+    expr: sum(container_memory_usage_bytes{name=~"query-node.*"}) > 1200000000
     for: 30s
     labels:
       severity: warning
@@ -96,7 +96,7 @@ groups:
       description: "{{ $labels.instance }} memory consumption is at {{ humanize $value}}."
 
   - alert: postgres_down
-    expr: absent((time() - container_last_seen{name=~"${PROJECT}-postgres-node.*"}) < 10)
+    expr: absent((time() - container_last_seen{name=~"postgres-node.*"}) < 10)
     for: 10s
     labels:
       severity: critical
@@ -105,7 +105,7 @@ groups:
       description: "{{ $labels.instance }} container is down for more than 30 seconds."
 
   - alert: postgres_high_cpu
-    expr: sum(rate(container_cpu_usage_seconds_total{name=~"${PROJECT}-postgres-node.*"}[1m])) / count(node_cpu_seconds_total{mode="system"}) * 100 > 10
+    expr: sum(rate(container_cpu_usage_seconds_total{name=~"postgres-node.*"}[1m])) / count(node_cpu_seconds_total{mode="system"}) * 100 > 10
     for: 30s
     labels:
       severity: warning
@@ -114,7 +114,7 @@ groups:
       description: "{{ $labels.instance }} CPU usage is {{ humanize $value}}%."
 
   - alert: postgres_high_memory
-    expr: sum(container_memory_usage_bytes{name=~"${PROJECT}-postgres-node.*"}) > 1200000000
+    expr: sum(container_memory_usage_bytes{name=~"postgres-node.*"}) > 1200000000
     for: 30s
     labels:
       severity: warning

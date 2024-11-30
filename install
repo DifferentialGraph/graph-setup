@@ -1,63 +1,263 @@
-#!/bin/bash
-source utils/msg
-source utils/configure
-source utils/docker
-source utils/manage
+#!/bin/bash -i
 
-# export to .bashrc if needed
-if ! grep -q "#graph-setup" ~/.bashrc; then
-  echo "Modifying .bashrc ..."
-  DIR="$( cd "$( dirname -- $0 )" && pwd )"
-  echo -e "\n" >> ~/.bashrc
-  echo "#graph-setup" >> ~/.bashrc
-  echo "export GRAPH_DIR=$DIR" >> ~/.bashrc
-  echo 'source $GRAPH_DIR/utils/managev2' >> ~/.bashrc
-  source ~/.bashrc
-fi
+basics-install() {
+    apt update
+    apt -y install ca-certificates curl grep git apache2-utils
+}
 
-# Check if project name is defined
-if [ -z "$1" ]; then
-  echo "No project defined" >&2
-  exit 1
-fi
+docker-install() {
+    if ! grep -q "docker" <<< $(find /etc/apt/ -name *.list | xargs cat | grep  ^[[:space:]]*deb | grep -v deb-src); then
+        echo "Installing Docker..."
+        install -m 0755 -d /etc/apt/keyrings
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+        chmod a+r /etc/apt/keyrings/docker.asc
+        echo \
+            "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+            $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+            sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+            apt update && apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin docker-compose
+        apt -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin docker-compose
+    fi
+}
 
-# Check if the network is defined
-if [ -z "$2" ]; then
-  echo "No network defined" >&2
-  exit 1
-fi
+nodejs-install() {
+    if [ ! -d "$HOME/.nvm" ]; then
+        echo "Installing NVM..."
+        apt -y install curl grep
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh | bash
+        source $HOME/.bashrc
+        nvm install --lts
+        nvm use --lts
+    fi
 
-# Install requirements
-install-required || error "Could not install required."
+    if [ `npm list -g | grep -c pino-pretty` -eq 0 ]; then
+        echo "Installing Pino Pretty..."
+        npm install -g pino-pretty
+    fi
+}
 
-# Generate configurartion file if not existing
-if [ ! -f .env.$1 ]; then
-  generate-project-env $1 $2 || error "Could not generate environment file."
-fi
-source .env.$1
+reverseproxy-check() {
+    if [ "$( docker container inspect -f '{{.State.Running}}' nginx-proxy )" = "false" ] || [ "$( docker container inspect -f '{{.State.Running}}' nginx-ssl )" = "false" ]; then
+        return 1
+    fi
+}
 
-# create indexer network
-docker network create $1-indexer || true
 
-# start node
-graph-start $1 node
+indexer-env()
+{
+    [ -f "envs/indexer.env" ] || { echo "Error: user indexer.env file not found"; return 1; }
+    source envs/indexer.env
+    cp envs/indexer.env envs/indexer-$INDEXER_NAME.env
 
-# start indexer
-graph-start $1 indexer
+    if [ ! -z $INDEXER_HOST ]; then
+        sed -i "s/^PUBLIC_INDEXER_URL=.*/PUBLIC_INDEXER_URL=$(echo "https://index-$INDEXER_NAME.$INDEXER_HOST/" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
+    else
+        echo "to do"
+    fi
 
-# start monitor
-graph-start $1 monitor
+    case $INDEXER_NETWORK in
+        "arbitrum-one")
+            sed -i "s/^NETWORK_PROVIDER=.*/NETWORK_PROVIDER=$(echo "$TXN_RPC_MAIN" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
+            sed -i "s/^NETWORK_SUBGRAPH_DEPLOYMENT=.*/NETWORK_SUBGRAPH_DEPLOYMENT=$(echo "QmSWxvd8SaQK6qZKJ7xtfxCCGoRzGnoi2WNzmJYYJW9BXY" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
+            sed -i "s/^NETWORK_SUBGRAPH_ENDPOINT=.*/NETWORK_SUBGRAPH_ENDPOINT=$(echo "https://api.thegraph.com/subgraphs/name/graphprotocol/graph-network-arbitrum" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
+            # sed -i "s/^NETWORK_SUBGRAPH_ENDPOINT=.*/NETWORK_SUBGRAPH_ENDPOINT=$(echo "https://gateway-arbitrum.network.thegraph.com/api/$APIKEY/subgraphs/id/DZz4kDTdmzWLWsV373w2bSmoar3umKKH9y82SUKr5qmp" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
+            sed -i "s/^DAI_CONTRACT=.*/DAI_CONTRACT=$(echo "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
+            sed -i "s/^GATEWAY_ENDPOINT=.*/GATEWAY_ENDPOINT=$(echo "https://gateway-arbitrum.network.thegraph.com/" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
+            sed -i "s/^EPOCH_SUBGRAPH_ENDPOINT=.*/EPOCH_SUBGRAPH_ENDPOINT=$(echo "https://api.thegraph.com/subgraphs/name/graphprotocol/arbitrum-epoch-block-oracle" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
+            # sed -i "s/^EPOCH_SUBGRAPH_ENDPOINT=.*/EPOCH_SUBGRAPH_ENDPOINT=$(echo "https://gateway-arbitrum.network.thegraph.com/api/$APIKEY/subgraphs/id/4KFYqUWRTZQ9gn7GPHC6YQ2q15chJfVrX43ezYcwkgxB" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
+            sed -i "s/^CLIENT_SIGNER_ADDRESS=.*/CLIENT_SIGNER_ADDRESS=$(echo "0xc483960d4D58eabc434Dc88a620AdFd883D6Dd4e" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
+            # sed -i "s/^COLLECT_RECEIPTS_ENDPOINT=.*/COLLECT_RECEIPTS_ENDPOINT=$(echo "https://gateway-arbitrum.network.thegraph.com/collect-receipts" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
+            ;;
+        "arbitrum-sepolia")
+            sed -i "s/^NETWORK_PROVIDER=.*/NETWORK_PROVIDER=$(echo "$TXN_RPC_TEST" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
+            sed -i "s/^NETWORK_SUBGRAPH_DEPLOYMENT=.*/NETWORK_SUBGRAPH_DEPLOYMENT=$(echo "QmXnGVrg6DvscnvJd86aHAPLGyGrkM17weMrAsFAEMmQLL" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
+            sed -i "s/^NETWORK_SUBGRAPH_ENDPOINT=.*/NETWORK_SUBGRAPH_ENDPOINT=$(echo "https://api.thegraph.com/subgraphs/name/graphprotocol/graph-network-arbitrum-sepolia" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
+            # sed -i "s/^NETWORK_SUBGRAPH_ENDPOINT=.*/NETWORK_SUBGRAPH_ENDPOINT=$(echo "https://gateway-arbitrum.network.thegraph.com/api/$APIKEY/subgraphs/id/3xQHhMudr1oh69ut36G2mbzpYmYxwqCeU6wwqyCDCnqV" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
+            sed -i "s/^DAI_CONTRACT=.*/DAI_CONTRACT=$(echo "0x9e7e607afd22906f7da6f1ec8f432d6f244278be" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
+            sed -i "s/^GATEWAY_ENDPOINT=.*/GATEWAY_ENDPOINT=$(echo "https://gateway-arbitrum.testnet.thegraph.com/" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
+            sed -i "s/^EPOCH_SUBGRAPH_ENDPOINT=.*/EPOCH_SUBGRAPH_ENDPOINT=$(echo "https://api.thegraph.com/subgraphs/name/graphprotocol/arbitrum-sepolia-ebo" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
+            # sed -i "s/^EPOCH_SUBGRAPH_ENDPOINT=.*/EPOCH_SUBGRAPH_ENDPOINT=$(echo "https://gateway-arbitrum.network.thegraph.com/api/$APIKEY/subgraphs/id/BhnsdeZihU4SuokxZMLF4FQBVJ3jgtZf6v51gHvz3bSS" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
+            sed -i "s/^CLIENT_SIGNER_ADDRESS=.*/CLIENT_SIGNER_ADDRESS=$(echo "0xac01B0b3B2Dc5D8E0D484c02c4d077C15C96a7b4" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
+            # sed -i "s/^COLLECT_RECEIPTS_ENDPOINT=.*/COLLECT_RECEIPTS_ENDPOINT=$(echo "https://gateway-arbitrum.testnet.thegraph.com/collect-receipts" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
+            ;;
+        *)
+            echo "Error: network not supported." >&2
+            return 1
+            ;;
+    esac
+}
 
-# connect to reverse proxy
-if [ "$( docker container inspect -f '{{.State.Status}}' $PROXY-proxy )" == "running" ]; then
-  if [ $PROXY == "nginx" ]; then
-    htpasswd -c -b /var/lib/docker/volumes/nginx_htpasswd/_data/prometheus-$1.$HOST $PROMETHEUS_USER $PROMETHEUS_PASS
-  fi
-  graph-connect $1 $PROXY
+node-config()
+{
+# Datbase
+cat <<EOF >$1
+[store]
+[store.primary]
+connection = "postgresql://${DB_NODE_USER}:${DB_NODE_PASS}@:5432/${DB_NODE_NAME}?host=/var/run/postgresql"
+pool_size = 10
+
+[chains]
+ingestor = "index_node"
+
+EOF
+
+# Chains
+for (( j=0; j<${#CHAIN_NAME[@]}; j++ ));
+do
+if [  "${CHAIN_RPC[$j]%%:*}" == "http" ] || [ "${CHAIN_RPC[$j]%%:*}" == "https" ]; then
+	TRANSPORT="rpc"
+elif [ "${CHAIN_RPC[$j]%%:*}" == "ws" ] || [ "${CHAIN_RPC[$j]%%:*}" == "wss" ]; then 
+	TRANSPORT="ws"
 else
-  echo "$PROXY-proxy not running."
+	{ echo "Error: unknown URL"; return 1; }
 fi
+cat <<EOF >>$1
+[chains.${CHAIN_NAME[$j]}]
+shard = "primary"
+provider = [ { label = "${CHAIN_NAME[$j]}", url = "${CHAIN_RPC[$j]}", transport = "$TRANSPORT", features = ["archive", "traces"] } ]
 
-# Populate with subgraph sizes for grafana
-sleep 5
-docker exec -it $1-postgres-node psql -U ${DB_NODE_USER} ${DB_NODE_NAME} -c "refresh materialized view info.subgraph_sizes;"
+EOF
+done
+
+# Deployment
+cat <<EOF >>$1
+[deployment]
+[[deployment.rule]]
+indexers = [ "index_node" ]
+
+[general]
+query = "query_node"
+EOF
+}
+
+graphnode-install() {
+    whiptail --title "Graph Setup" --yesno "Install graph node?" 8 78 || { echo "User exit"; return; }
+    [ -f "envs/node.env" ] || { echo "Error: user node.env file not found"; return 1; }
+    source envs/node.env
+
+    docker volume create graph-node_config
+    NODE_CONFIG_FILE=/var/lib/docker/volumes/graph-node_config/_data/config.toml
+    node-config $NODE_CONFIG_FILE
+
+    COMPOSE_FILE=services/node.yml \
+    COMPOSE_IGNORE_ORPHANS=True \
+    docker compose --env-file envs/node.env up -d --force-recreate --build
+
+    for node in "${CHAIN_NAME[@]}"; do
+        [ "$(docker network ls -f name=$node -q)" ] && docker network connect $node index-node && docker network connect $node query-node
+    done
+
+    if [ -n  $NODE_HOST ]; then
+        reverseproxy-check || { echo "Error: reverse proxy not running" ; return; }
+        docker network connect reverse-proxy index-node && docker network connect reverse-proxy query-node
+
+        if [ ! -z $WHITELIST ]; then
+            VHOST_PATH=/var/lib/docker/volumes/reverse-proxy_vhost/_data
+            for (( j=0; j<${#WHITELIST[@]}; j++ )); do
+                echo "allow ${WHITELIST[$j]};" >> ${VHOST_PATH}/thegraph.${NODE_HOST}
+            done
+            echo "deny all;" >> ${VHOST_PATH}/thegraph.${NODE_HOST}
+        fi
+    fi
+}
+
+graphindexer-install() {
+    whiptail --title "Graph Setup" --yesno "Install graph indexer?" 8 78 || { echo "User exit"; return; }
+    indexer-env || { echo "Error: could not generate indexer env file"; return 1; }
+
+    COMPOSE_FILE=services/indexer.yml \
+    COMPOSE_IGNORE_ORPHANS=True \
+    docker compose --env-file envs/indexer-$INDEXER_NAME.env up -d --force-recreate --build
+    touch /var/lib/docker/volumes/${INDEXER_NAME}-indexer_cli-history/_data/.bash_history
+
+    if [ "$( docker container inspect -f '{{.State.Running}}' index-node )" = "true" ] && [ "$( docker container inspect -f '{{.State.Running}}' query-node )" = "true" ]; then
+        docker network connect graph-node $INDEXER_NAME-indexer-service && docker network connect graph-node $INDEXER_NAME-indexer-agent && docker network connect graph-node $INDEXER_NAME-indexer-cli
+    fi
+
+    if [ -n  $INDEXER_HOST ]; then
+        reverseproxy-check || { echo "Error: reverse proxy not running" ; return; }
+        docker network connect reverse-proxy $INDEXER_NAME-indexer-service
+    fi
+}
+
+graphmonitor-install() {
+    whiptail --title "Graph Setup" --yesno "Install graph monitor?" 8 78 || { echo "User exit"; return; }
+    
+    [ -f "envs/monitor.env" ] || { echo "Error: user monitor.env file not found"; return 1; }
+    source envs/monitor.env
+    [ -f "envs/indexer-$MONITOR_INDEXER.env" ] || { echo "Error: user indexer-$MONITOR_INDEXER.env file not found"; return 1; }
+    [ -f "envs/node.env" ] || { echo "Error: user node.env file not found"; return 1; }
+    source envs/node.env
+
+    if [ ! -z $MONITOR_HOST ]; then
+        sed -i "s/^GRAFANA_HOST=.*/GRAFANA_HOST=$(echo "dashboard-$MONITOR_INDEXER.$MONITOR_HOST" | sed 's/[&/\]/\\&/g')/" "envs/monitor.env"
+        sed -i "s/^PROMETHEUS_HOST=.*/PROMETHEUS_HOST=$(echo "prometheus-$MONITOR_INDEXER.$MONITOR_HOST" | sed 's/[&/\]/\\&/g')/" "envs/monitor.env"
+    else
+        echo "to do"
+    fi
+    export MONITOR_INDEXER
+    # Prometheus
+    docker volume create ${MONITOR_INDEXER}-monitor_prometheus-config
+    cp prometheus/alert.rules /var/lib/docker/volumes/${MONITOR_INDEXER}-monitor_prometheus-config/_data/alert.rules
+    envsubst < prometheus/prometheus.yml > /var/lib/docker/volumes/${MONITOR_INDEXER}-monitor_prometheus-config/_data/prometheus.yml
+    
+    # Grafana
+    docker volume create ${MONITOR_INDEXER}-monitor_grafana-provisioning
+    cp -R grafana/dashboards/ grafana/datasources/ /var/lib/docker/volumes/${MONITOR_INDEXER}-monitor_grafana-provisioning/_data
+    # envsubst < grafana/dashboards/indexing-performance-metrics.json > /var/lib/docker/volumes/${MONITOR_INDEXER}-monitor_grafana-provisioning/_data/dashboards/indexing-performance-metrics.json
+    
+    # Alertmanager
+    docker volume create ${MONITOR_INDEXER}-monitor_alertmanager-config
+    cp alertmanager/config.yml /var/lib/docker/volumes/${MONITOR_INDEXER}-monitor_alertmanager-config/_data
+
+    COMPOSE_FILE=services/monitor.yml \
+    COMPOSE_IGNORE_ORPHANS=True \
+    docker compose --env-file envs/monitor.env --env-file envs/node.env --env-file envs/indexer-$MONITOR_INDEXER.env up -d --force-recreate --build
+
+    if [ "$( docker container inspect -f '{{.State.Running}}' index-node )" = "true" ] && [ "$( docker container inspect -f '{{.State.Running}}' query-node )" = "true" ] && [ "$( docker container inspect -f '{{.State.Running}}' postgres-node )" = "true" ]; then
+        docker network connect graph-node ${MONITOR_INDEXER}-monitor-prometheus && docker network connect graph-node ${MONITOR_INDEXER}-monitor-grafana
+    fi
+
+    if [ "$( docker container inspect -f '{{.State.Running}}' ${MONITOR_INDEXER}-indexer-service )" = "true" ]; then
+        docker network connect ${MONITOR_INDEXER}-indexer ${MONITOR_INDEXER}-monitor-prometheus
+    fi
+
+    if [ -n  $MONITOR_HOST ]; then
+        reverseproxy-check || { echo "Error: reverse proxy not running" ; return; }
+        docker network connect reverse-proxy ${MONITOR_INDEXER}-monitor-prometheus && docker network connect reverse-proxy ${MONITOR_INDEXER}-monitor-grafana
+        htpasswd -c -b /var/lib/docker/volumes/reverse-proxy_htpasswd/_data/prometheus-${MONITOR_INDEXER}.${MONITOR_HOST} $PROMETHEUS_USER $PROMETHEUS_PASS
+    fi
+
+    sleep 5
+    source envs/node.env
+    docker exec -it postgres-node psql -U ${DB_NODE_USER} ${DB_NODE_NAME} -c "refresh materialized view info.subgraph_sizes;"
+    unset MONITOR_INDEXER
+}
+
+
+if [ "${1}" != "--source" ]; then
+    apt update && apt install -y whiptail
+    whiptail --title "Graph Setup" --yesno "Install graph setup?" 8 78 || { echo "User exit"; exit 1; }
+
+    basics-install || { echo "Error: could not install basic tools"; exit 1; }
+
+    docker-install || { echo "Error: could not install Docker"; exit 1; }
+
+    nodejs-install || { echo "Error: could not install Node.js"; exit 1; }
+
+    graphnode-install || { echo "Error: could not install graph node"; exit 1; }
+
+    graphindexer-install || { echo "Error: could not install graph indexer"; exit 1; }
+
+    graphmonitor-install || { echo "Error: could not install graph monitor"; exit 1; }
+
+    if ! grep -q "#graph-setup" ~/.bashrc; then
+        echo "Modifying .bashrc ..."
+        DIR="$( cd "$( dirname -- $0 )" && pwd )"
+        echo -e "\n" >> ~/.bashrc
+        echo "#graph-setup" >> ~/.bashrc
+        echo "export GRAPH_DIR=$DIR" >> ~/.bashrc
+        echo 'source $GRAPH_DIR/utils/manage' >> ~/.bashrc
+        source ~/.bashrc
+    fi
+fi

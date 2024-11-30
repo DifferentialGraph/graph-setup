@@ -1,5 +1,3 @@
-version: '3.9'
-
 x-logging:
   &default-logging
   options:
@@ -9,23 +7,23 @@ x-logging:
 
 volumes:
   db-node:
+    name: graph-node_db-node
   db-socket:
+    name: graph-node_db-socket
   node-config:
     external: true
-    name: ${COMPOSE_PROJECT_NAME}_node-config
+    name: graph-node_config
 
 networks:
-  indexer:
-    name: ${COMPOSE_PROJECT_NAME}-indexer
-    external: true
+  graph-node:
+    name: graph-node
 
 services:
-# INDEX NODE
   index-node:
     image: graphprotocol/graph-node:${NODE_VERSION}
-    container_name: ${COMPOSE_PROJECT_NAME}-index-node
+    container_name: index-node
     networks:
-      - indexer
+      - graph-node
     expose:
       - 8000
       - 8001
@@ -36,7 +34,7 @@ services:
     environment:
       node_role: index-node
       node_id: index_node
-      postgres_host: ${COMPOSE_PROJECT_NAME}-postgres-node
+      postgres_host: postgres-node
       postgres_user: ${DB_NODE_USER}
       postgres_pass: ${DB_NODE_PASS}
       postgres_db: ${DB_NODE_NAME}
@@ -59,20 +57,22 @@ services:
       BLOCK_INGESTOR: index_node
       ETHEREUM_POLLING_INTERVAL: 500
       GRAPH_ETH_CALL_NO_GAS: 421613,42161
+      # GRAPH_MAX_SPEC_VERSION: 1.2.0
     volumes:
       - db-socket:/var/run/postgresql
       - node-config:/root/node-config/
     restart: unless-stopped
     logging: *default-logging
 
-# QUERY NODE
   query-node:
     image: graphprotocol/graph-node:${NODE_VERSION}
-    container_name: ${COMPOSE_PROJECT_NAME}-query-node
+    container_name: query-node
     networks:
-      - indexer
+      - graph-node
+    ports:
+      - 127.0.0.1:8000:8000 # port to query subgraphs
     expose:
-      - 8000
+      # - 8000
       - 8001
       - 8020
       - 8030
@@ -82,7 +82,7 @@ services:
     environment:
       node_role: query-node
       node_id: query_node
-      postgres_host: ${COMPOSE_PROJECT_NAME}-postgres-node
+      postgres_host: postgres-node
       postgres_user: ${DB_NODE_USER}
       postgres_pass: ${DB_NODE_PASS}
       postgres_db: ${DB_NODE_NAME}
@@ -98,6 +98,25 @@ services:
       EXPERIMENTAL_SUBGRAPH_VERSION_SWITCHING_MODE: synced
       GRAPH_KILL_IF_UNRESPONSIVE: true
       GRAPH_ALLOW_NON_DETERMINISTIC_FULLTEXT_SEARCH: true
+      # GRAPH_MAX_SPEC_VERSION: 1.2.0
+      VIRTUAL_HOST: thegraph.${NODE_HOST}
+      VIRTUAL_PORT: 8000
+      LETSENCRYPT_HOST: thegraph.${NODE_HOST}
+      VIRTUAL_HOST_MULTIPORTS: |-
+        thegraph.${NODE_HOST}:
+          "/":
+            port: 8000
+            dest: "/subgraphs/id/QmSWxvd8SaQK6qZKJ7xtfxCCGoRzGnoi2WNzmJYYJW9BXY"
+          "/ws":
+            port: 8001
+            dest: "/subgraphs/id/QmSWxvd8SaQK6qZKJ7xtfxCCGoRzGnoi2WNzmJYYJW9BXY"
+          "/epoch":
+            port: 8000
+            dest: "/subgraphs/id/QmQEGDTb3xeykCXLdWx7pPX3qeeGMUvHmGWP4SpMkv5QJf"
+          "/epoch/ws":
+            port: 8001
+            dest: "/subgraphs/id/QmQEGDTb3xeykCXLdWx7pPX3qeeGMUvHmGWP4SpMkv5QJf"
+
     volumes:
       - db-socket:/var/run/postgresql
       - node-config:/root/node-config/
@@ -105,14 +124,16 @@ services:
     logging:
         driver: "journald"
 
-# NODE DATABASE
   postgres-node:
     image: postgres:${DB_NODE_VERSION}
-    container_name: ${COMPOSE_PROJECT_NAME}-postgres-node
+    container_name: postgres-node
+    shm_size: 1gb
     networks:
-      - indexer
-    expose:
-      - 5432
+      - graph-node
+    ports:
+      - 127.0.0.1:5432:5432
+    # expose:
+    #   - 5432
     command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements"]
     environment:
       POSTGRES_USER: ${DB_NODE_USER}

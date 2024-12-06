@@ -42,6 +42,10 @@ reverseproxy-check() {
     fi
 }
 
+edit-var() # file to edit - var to edit - var arg
+{
+    sed -i "s/^${2}=.*/${2}=$(echo "${3}" | sed 's/[&/\]/\\&/g')/" ${1}
+}
 
 indexer-env()
 {
@@ -49,36 +53,90 @@ indexer-env()
     source envs/indexer.env
     cp envs/indexer.env envs/indexer-$INDEXER_NAME.env
 
+    INDEXER_ENV="envs/indexer-$INDEXER_NAME.env"
+
     if [ ! -z $INDEXER_HOST ]; then
-        sed -i "s/^PUBLIC_INDEXER_URL=.*/PUBLIC_INDEXER_URL=$(echo "https://index-$INDEXER_NAME.$INDEXER_HOST/" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
-    else
-        echo "to do"
+        edit-var $INDEXER_ENV "PUBLIC_INDEXER_URL" "https://index-$INDEXER_NAME.$INDEXER_HOST/"
+    fi
+
+    if [ -z $GRAPH_NODE_QUERY_ENDPOINT ]; then
+        edit-var $INDEXER_ENV "GRAPH_NODE_QUERY_ENDPOINT" "http://query-node:8000"
+    fi
+
+    if [ -z $GRAPH_NODE_STATUS_ENDPOINT ]; then
+        edit-var $INDEXER_ENV "GRAPH_NODE_STATUS_ENDPOINT" "http://index-node:8030/graphql"
+    fi
+
+    if [ -z $GRAPH_NODE_QUERY_ENDPOINT ]; then
+        edit-var $INDEXER_ENV "GRAPH_NODE_ADMIN_ENDPOINT" "http://index-node:8020"
+    fi
+
+    if [ -z $SERVICE_QUERY_PORT ]; then
+        edit-var $INDEXER_ENV "SERVICE_QUERY_PORT" "7600"
+    fi
+
+    if [ -z $POSTGRES_HOST ]; then
+        edit-var $INDEXER_ENV "POSTGRES_HOST" "${INDEXER_NAME}-postgres-indexer"
     fi
 
     case $INDEXER_NETWORK in
         "arbitrum-one")
-            sed -i "s/^NETWORK_PROVIDER=.*/NETWORK_PROVIDER=$(echo "$TXN_RPC_MAIN" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
-            sed -i "s/^NETWORK_SUBGRAPH_DEPLOYMENT=.*/NETWORK_SUBGRAPH_DEPLOYMENT=$(echo "QmSWxvd8SaQK6qZKJ7xtfxCCGoRzGnoi2WNzmJYYJW9BXY" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
-            sed -i "s/^NETWORK_SUBGRAPH_ENDPOINT=.*/NETWORK_SUBGRAPH_ENDPOINT=$(echo "https://api.thegraph.com/subgraphs/name/graphprotocol/graph-network-arbitrum" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
-            # sed -i "s/^NETWORK_SUBGRAPH_ENDPOINT=.*/NETWORK_SUBGRAPH_ENDPOINT=$(echo "https://gateway-arbitrum.network.thegraph.com/api/$APIKEY/subgraphs/id/DZz4kDTdmzWLWsV373w2bSmoar3umKKH9y82SUKr5qmp" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
-            sed -i "s/^DAI_CONTRACT=.*/DAI_CONTRACT=$(echo "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
-            sed -i "s/^GATEWAY_ENDPOINT=.*/GATEWAY_ENDPOINT=$(echo "https://gateway-arbitrum.network.thegraph.com/" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
-            sed -i "s/^EPOCH_SUBGRAPH_ENDPOINT=.*/EPOCH_SUBGRAPH_ENDPOINT=$(echo "https://api.thegraph.com/subgraphs/name/graphprotocol/arbitrum-epoch-block-oracle" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
-            # sed -i "s/^EPOCH_SUBGRAPH_ENDPOINT=.*/EPOCH_SUBGRAPH_ENDPOINT=$(echo "https://gateway-arbitrum.network.thegraph.com/api/$APIKEY/subgraphs/id/4KFYqUWRTZQ9gn7GPHC6YQ2q15chJfVrX43ezYcwkgxB" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
-            sed -i "s/^CLIENT_SIGNER_ADDRESS=.*/CLIENT_SIGNER_ADDRESS=$(echo "0xc483960d4D58eabc434Dc88a620AdFd883D6Dd4e" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
-            # sed -i "s/^COLLECT_RECEIPTS_ENDPOINT=.*/COLLECT_RECEIPTS_ENDPOINT=$(echo "https://gateway-arbitrum.network.thegraph.com/collect-receipts" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
+            edit-var $INDEXER_ENV "NETWORK_PROVIDER" "$TXN_RPC_MAIN"
+
+            edit-var $INDEXER_ENV "NETWORK_SUBGRAPH_DEPLOYMENT" "QmUzRg2HHMpbgf6Q4VHKNDbtBEJnyp5JWCh2gUX9AV6jXv"
+            if [ -z $NETWORK_SUBGRAPH_ENDPOINT ]; then
+                edit-var $INDEXER_ENV "NETWORK_SUBGRAPH_ENDPOINT" "https://gateway-arbitrum.network.thegraph.com/api/$APIKEY/subgraphs/id/DZz4kDTdmzWLWsV373w2bSmoar3umKKH9y82SUKr5qmp"
+            fi
+
+            if [ -z $TAP_SUBGRAPH_ENDPOINT ]; then
+                edit-var $INDEXER_ENV "TAP_SUBGRAPH_ENDPOINT" "https://gateway-arbitrum.network.thegraph.com/api/$APIKEY/subgraphs/id/4sukbNVTzGELnhdnpyPqsf1QqtzNHEYKKmJkgaT8z6M1"
+            fi
+
+            edit-var $INDEXER_ENV "EPOCH_SUBGRAPH_ENDPOINT" "https://gateway-arbitrum.network.thegraph.com/api/$APIKEY/subgraphs/id/4KFYqUWRTZQ9gn7GPHC6YQ2q15chJfVrX43ezYcwkgxB"
+
+            edit-var $INDEXER_ENV "DAI_CONTRACT" "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+
+            edit-var $INDEXER_ENV "GATEWAY_ENDPOINT" "https://gateway-arbitrum.network.thegraph.com/"
+
+            edit-var $INDEXER_ENV "ESCROW_SUBGRAPH_DEPLOYMENT" "QmUhiH6Z5xo6o3GNzsSvqpGKLmCt6w5WzKQ1yHk6C8AA8S"
+            if [ -z $ESCROW_SUBGRAPH_ENDPOINT ]; then
+                edit-var $INDEXER_ENV "ESCROW_SUBGRAPH_ENDPOINT" "https://gateway-arbitrum.network.thegraph.com/api/$APIKEY/subgraphs/id/4sukbNVTzGELnhdnpyPqsf1QqtzNHEYKKmJkgaT8z6M1"
+            fi
+
+            if [ -z $BLOCKCHAIN_CHAIN_ID ]; then
+                edit-var $INDEXER_ENV "BLOCKCHAIN_CHAIN_ID" "42161"
+            fi
+
+            edit-var $INDEXER_ENV "BLOCKCHAIN_RECEIPTS_VERIFIER_ADDRESS" "0x33f9E93266ce0E108fc85DdE2f71dab555A0F05a"
             ;;
         "arbitrum-sepolia")
-            sed -i "s/^NETWORK_PROVIDER=.*/NETWORK_PROVIDER=$(echo "$TXN_RPC_TEST" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
-            sed -i "s/^NETWORK_SUBGRAPH_DEPLOYMENT=.*/NETWORK_SUBGRAPH_DEPLOYMENT=$(echo "QmXnGVrg6DvscnvJd86aHAPLGyGrkM17weMrAsFAEMmQLL" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
-            sed -i "s/^NETWORK_SUBGRAPH_ENDPOINT=.*/NETWORK_SUBGRAPH_ENDPOINT=$(echo "https://api.thegraph.com/subgraphs/name/graphprotocol/graph-network-arbitrum-sepolia" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
-            # sed -i "s/^NETWORK_SUBGRAPH_ENDPOINT=.*/NETWORK_SUBGRAPH_ENDPOINT=$(echo "https://gateway-arbitrum.network.thegraph.com/api/$APIKEY/subgraphs/id/3xQHhMudr1oh69ut36G2mbzpYmYxwqCeU6wwqyCDCnqV" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
-            sed -i "s/^DAI_CONTRACT=.*/DAI_CONTRACT=$(echo "0x9e7e607afd22906f7da6f1ec8f432d6f244278be" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
-            sed -i "s/^GATEWAY_ENDPOINT=.*/GATEWAY_ENDPOINT=$(echo "https://gateway-arbitrum.testnet.thegraph.com/" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
-            sed -i "s/^EPOCH_SUBGRAPH_ENDPOINT=.*/EPOCH_SUBGRAPH_ENDPOINT=$(echo "https://api.thegraph.com/subgraphs/name/graphprotocol/arbitrum-sepolia-ebo" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
-            # sed -i "s/^EPOCH_SUBGRAPH_ENDPOINT=.*/EPOCH_SUBGRAPH_ENDPOINT=$(echo "https://gateway-arbitrum.network.thegraph.com/api/$APIKEY/subgraphs/id/BhnsdeZihU4SuokxZMLF4FQBVJ3jgtZf6v51gHvz3bSS" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
-            sed -i "s/^CLIENT_SIGNER_ADDRESS=.*/CLIENT_SIGNER_ADDRESS=$(echo "0xac01B0b3B2Dc5D8E0D484c02c4d077C15C96a7b4" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
-            # sed -i "s/^COLLECT_RECEIPTS_ENDPOINT=.*/COLLECT_RECEIPTS_ENDPOINT=$(echo "https://gateway-arbitrum.testnet.thegraph.com/collect-receipts" | sed 's/[&/\]/\\&/g')/" "envs/indexer-$INDEXER_NAME.env"
+            edit-var $INDEXER_ENV "NETWORK_PROVIDER" "$TXN_RPC_MAIN"
+
+            edit-var $INDEXER_ENV "NETWORK_SUBGRAPH_DEPLOYMENT" "QmSWxvd8SaQK6qZKJ7xtfxCCGoRzGnoi2WNzmJYYJW9BXY"
+            if [ -z $NETWORK_SUBGRAPH_ENDPOINT ]; then
+                edit-var $INDEXER_ENV "NETWORK_SUBGRAPH_ENDPOINT" "https://gateway-arbitrum.network.thegraph.com/api/$APIKEY/subgraphs/id/DZz4kDTdmzWLWsV373w2bSmoar3umKKH9y82SUKr5qmp"
+            fi
+
+            if [ -z $TAP_SUBGRAPH_ENDPOINT ]; then
+                edit-var $INDEXER_ENV "TAP_SUBGRAPH_ENDPOINT" "https://gateway-arbitrum.network.thegraph.com/api/$APIKEY/subgraphs/id/4sukbNVTzGELnhdnpyPqsf1QqtzNHEYKKmJkgaT8z6M1"
+            fi
+
+            edit-var $INDEXER_ENV "EPOCH_SUBGRAPH_ENDPOINT" "https://gateway-arbitrum.network.thegraph.com/api/$APIKEY/subgraphs/id/4KFYqUWRTZQ9gn7GPHC6YQ2q15chJfVrX43ezYcwkgxB"
+
+            edit-var $INDEXER_ENV "DAI_CONTRACT" "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+
+            edit-var $INDEXER_ENV "GATEWAY_ENDPOINT" "https://gateway-arbitrum.network.thegraph.com/"
+
+            edit-var $INDEXER_ENV "ESCROW_SUBGRAPH_DEPLOYMENT" "QmUhiH6Z5xo6o3GNzsSvqpGKLmCt6w5WzKQ1yHk6C8AA8S"
+            if [ -z $ESCROW_SUBGRAPH_ENDPOINT ]; then
+                edit-var $INDEXER_ENV "ESCROW_SUBGRAPH_ENDPOINT" "https://gateway-arbitrum.network.thegraph.com/api/$APIKEY/subgraphs/id/4sukbNVTzGELnhdnpyPqsf1QqtzNHEYKKmJkgaT8z6M1"
+            fi
+
+            if [ -z $BLOCKCHAIN_CHAIN_ID ]; then
+                edit-var $INDEXER_ENV "BLOCKCHAIN_CHAIN_ID" "42161"
+            fi
+
+            edit-var $INDEXER_ENV "BLOCKCHAIN_RECEIPTS_VERIFIER_ADDRESS" "0x33f9E93266ce0E108fc85DdE2f71dab555A0F05a"
             ;;
         *)
             echo "Error: network not supported." >&2
@@ -171,7 +229,7 @@ graphindexer-install() {
     touch /var/lib/docker/volumes/${INDEXER_NAME}-indexer_cli-history/_data/.bash_history
 
     if [ "$( docker container inspect -f '{{.State.Running}}' index-node )" = "true" ] && [ "$( docker container inspect -f '{{.State.Running}}' query-node )" = "true" ]; then
-        docker network connect graph-node $INDEXER_NAME-indexer-service && docker network connect graph-node $INDEXER_NAME-indexer-agent && docker network connect graph-node $INDEXER_NAME-indexer-cli
+        docker network connect graph-node $INDEXER_NAME-indexer-service && docker network connect graph-node $INDEXER_NAME-indexer-tap && docker network connect graph-node $INDEXER_NAME-indexer-agent && docker network connect graph-node $INDEXER_NAME-indexer-cli
     fi
 
     if [ -n  $INDEXER_HOST ]; then
@@ -200,12 +258,12 @@ graphmonitor-install() {
     docker volume create ${MONITOR_INDEXER}-monitor_prometheus-config
     cp prometheus/alert.rules /var/lib/docker/volumes/${MONITOR_INDEXER}-monitor_prometheus-config/_data/alert.rules
     envsubst < prometheus/prometheus.yml > /var/lib/docker/volumes/${MONITOR_INDEXER}-monitor_prometheus-config/_data/prometheus.yml
-    
+
     # Grafana
     docker volume create ${MONITOR_INDEXER}-monitor_grafana-provisioning
     cp -R grafana/dashboards/ grafana/datasources/ /var/lib/docker/volumes/${MONITOR_INDEXER}-monitor_grafana-provisioning/_data
     # envsubst < grafana/dashboards/indexing-performance-metrics.json > /var/lib/docker/volumes/${MONITOR_INDEXER}-monitor_grafana-provisioning/_data/dashboards/indexing-performance-metrics.json
-    
+
     # Alertmanager
     docker volume create ${MONITOR_INDEXER}-monitor_alertmanager-config
     cp alertmanager/config.yml /var/lib/docker/volumes/${MONITOR_INDEXER}-monitor_alertmanager-config/_data

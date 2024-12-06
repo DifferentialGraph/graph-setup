@@ -106,17 +106,22 @@ services:
         thegraph.${NODE_HOST}:
           "/":
             port: 8000
-            dest: "/subgraphs/id/QmSWxvd8SaQK6qZKJ7xtfxCCGoRzGnoi2WNzmJYYJW9BXY"
+            dest: "/subgraphs/id/${NETWORK_SUBGRAPH_DEPLOYMENT:-QmUzRg2HHMpbgf6Q4VHKNDbtBEJnyp5JWCh2gUX9AV6jXv}"
           "/ws":
             port: 8001
-            dest: "/subgraphs/id/QmSWxvd8SaQK6qZKJ7xtfxCCGoRzGnoi2WNzmJYYJW9BXY"
+            dest: "/subgraphs/id/${NETWORK_SUBGRAPH_DEPLOYMENT:-QmUzRg2HHMpbgf6Q4VHKNDbtBEJnyp5JWCh2gUX9AV6jXv}"
           "/epoch":
             port: 8000
-            dest: "/subgraphs/id/QmQEGDTb3xeykCXLdWx7pPX3qeeGMUvHmGWP4SpMkv5QJf"
+            dest: "/subgraphs/id/${EPOCH_SUBGRAPH_DEPLOYMENT:-QmQfvGfWXh4pxuSykgHUJ8az26xYbxQVrRPso7MADRyuLk}"
           "/epoch/ws":
             port: 8001
-            dest: "/subgraphs/id/QmQEGDTb3xeykCXLdWx7pPX3qeeGMUvHmGWP4SpMkv5QJf"
-
+            dest: "/subgraphs/id/${EPOCH_SUBGRAPH_DEPLOYMENT:-QmQfvGfWXh4pxuSykgHUJ8az26xYbxQVrRPso7MADRyuLk}"
+          "/escrow":
+            port: 8000
+            dest: "/subgraphs/id/${ESCROW_SUBGRAPH_DEPLOYMENT:-QmUhiH6Z5xo6o3GNzsSvqpGKLmCt6w5WzKQ1yHk6C8AA8S}"
+          "/escrow/ws":
+            port: 8001
+            dest: "/subgraphs/id/${ESCROW_SUBGRAPH_DEPLOYMENT:-QmUhiH6Z5xo6o3GNzsSvqpGKLmCt6w5WzKQ1yHk6C8AA8S}"
     volumes:
       - db-socket:/var/run/postgresql
       - node-config:/root/node-config/

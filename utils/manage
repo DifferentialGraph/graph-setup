@@ -34,12 +34,16 @@ graph-monitor() {
         tmux new-window -t $1-indexer:3 -n 'indexer-service'
         tmux send-keys -t 'indexer-service' "docker logs ${1}-indexer-service --tail 10 -f | pino-pretty -c -t" C-m
 
+        # Indexer Tap Docker Log
+        tmux new-window -t $1-indexer:4 -n 'indexer-tap'
+        tmux send-keys -t 'indexer-tap' "docker logs ${1}-indexer-tap --tail 10 -f | pino-pretty -c -t" C-m
+
         # Index Node Docker Log
-        tmux new-window -t $1-indexer:4 -n 'index-node'
+        tmux new-window -t $1-indexer:5 -n 'index-node'
         tmux send-keys -t 'index-node' "docker logs index-node --tail 10 -f | pino-pretty -c -t" C-m
 
         # Query Node Docker Log
-        tmux new-window -t $1-indexer:5 -n 'query-node'
+        tmux new-window -t $1-indexer:6 -n 'query-node'
         tmux send-keys -t 'query-node' "docker logs query-node --tail 10 -f | pino-pretty -c -t" C-m
     fi
     tmux attach-session -t $1-indexer:0
@@ -84,6 +88,11 @@ graph-start() {
             [ -f "$GRAPH_DIR/envs/indexer-$2.env" ] || { echo "Error: user indexer-$2.env file not found"; return 1; }
             source $GRAPH_DIR/envs/indexer-$2.env
 
+            if ! volume-exists ${INDEXER_NAME}-indexer_config; then
+                docker volume create ${INDEXER_NAME}-indexer_config
+            fi
+            cp $GRAPH_DIR/config/indexer-config.toml /var/lib/docker/volumes/${INDEXER_NAME}-indexer_config/_data
+
             COMPOSE_FILE=$GRAPH_DIR/services/indexer.yml \
             COMPOSE_IGNORE_ORPHANS=True \
             docker compose --env-file $GRAPH_DIR/envs/indexer-$2.env up -d --force-recreate --build
@@ -93,7 +102,7 @@ graph-start() {
             fi
 
             if [ "$( docker container inspect -f '{{.State.Running}}' index-node )" = "true" ] && [ "$( docker container inspect -f '{{.State.Running}}' query-node )" = "true" ]; then
-                docker network connect graph-node $INDEXER_NAME-indexer-service && docker network connect graph-node $INDEXER_NAME-indexer-agent && docker network connect graph-node $INDEXER_NAME-indexer-cli
+                docker network connect graph-node $INDEXER_NAME-indexer-service && docker network connect graph-node $INDEXER_NAME-indexer-tap && docker network connect graph-node $INDEXER_NAME-indexer-agent && docker network connect graph-node $INDEXER_NAME-indexer-cli
             fi
 
             if [ -n  $INDEXER_HOST ]; then
@@ -117,14 +126,14 @@ graph-start() {
             fi
             cp $GRAPH_DIR/prometheus/alert.rules /var/lib/docker/volumes/${MONITOR_INDEXER}-monitor_prometheus-config/_data/alert.rules
             envsubst < $GRAPH_DIR/prometheus/prometheus.yml > /var/lib/docker/volumes/${MONITOR_INDEXER}-monitor_prometheus-config/_data/prometheus.yml
-            
+
             if ! volume-exists ${MONITOR_INDEXER}-monitor_grafana-provisioning; then
                 docker volume create ${MONITOR_INDEXER}-monitor_grafana-provisioning
             else
                 rm -rf /var/lib/docker/volumes/${MONITOR_INDEXER}-monitor_grafana-provisioning/_data/*
             fi
             cp -R $GRAPH_DIR/grafana/dashboards/ $GRAPH_DIR/grafana/datasources/ /var/lib/docker/volumes/${MONITOR_INDEXER}-monitor_grafana-provisioning/_data
-            
+
             if ! volume-exists ${MONITOR_INDEXER}-monitor_alertmanager-config; then
                 docker volume create ${MONITOR_INDEXER}-monitor_alertmanager-config
                 cp $GRAPH_DIR/alertmanager/config.yml /var/lib/docker/volumes/${MONITOR_INDEXER}-monitor_alertmanager-config/_data
@@ -133,7 +142,7 @@ graph-start() {
             COMPOSE_FILE=$GRAPH_DIR/services/monitor.yml \
             COMPOSE_IGNORE_ORPHANS=True \
             docker compose --env-file $GRAPH_DIR/envs/monitor.env --env-file $GRAPH_DIR/envs/node.env --env-file $GRAPH_DIR/envs/indexer-$2.env up -d --force-recreate --build
-            
+
             if [ "$( docker container inspect -f '{{.State.Running}}' index-node )" = "true" ] && [ "$( docker container inspect -f '{{.State.Running}}' query-node )" = "true" ] && [ "$( docker container inspect -f '{{.State.Running}}' postgres-node )" = "true" ]; then
                 docker network connect graph-node ${MONITOR_INDEXER}-monitor-prometheus && docker network connect graph-node ${MONITOR_INDEXER}-monitor-grafana
             fi

@@ -1,0 +1,147 @@
+# WARNING:  This shows all the possible configuration options. Make sure you know what
+#           you are doing.
+#           Prefer starting with `minimal-config-example.toml`.
+#
+# All the optional values (missing from the minimal config) are set to the current
+# default values.
+# You will have to change *most* the values below to match your setup.
+#
+# Some of the config below are global graph network values, which you can find here:
+# https://github.com/graphprotocol/indexer/tree/main/docs/networks
+#
+# If you want to supply some or all of the configuration below using environment variables,
+# use the prefix "INDEXER_SERVICE" or "TAP_AGENT" for indexer-service or tap-agent, respectively,
+# followed by the name of the field, using double underscores "__" for nesting. Example:
+#
+#       INDEXER_SERVICE_SUBGRAPHS__NETWORK__QUERY_URL = [...]
+#
+#   For
+#
+#       [subgraphs.network]
+#       query_url = [...]
+
+[indexer]
+indexer_address = "${INDEXER_ADDRESS}"
+operator_mnemonic = "${OPERATOR_MNEMONIC}"
+
+[metrics]
+# Port to serve metrics. This one should stay private.
+port = ${METRICS_PORT}
+
+[database]
+# The URL of the Postgres database used for the indexer components. The same database
+# that is used by the `indexer-agent`. It is expected that `indexer-agent` will create
+# the necessary tables.
+host = "${POSTGRES_HOST}"
+user = "${POSTGRES_USERNAME}"
+password = "${POSTGRES_PASSWORD}"
+database = "${POSTGRES_DATABASE}"
+port = ${POSTGRES_PORT}
+# postgres_url = "postgres://${POSTGRES_USERNAME}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DATABASE}"
+
+[graph_node]
+# URL to your graph-node's query endpoint
+query_url = "${GRAPH_NODE_QUERY_ENDPOINT}"
+# URL to your graph-node's status endpoint
+status_url = "${GRAPH_NODE_STATUS_ENDPOINT}"
+
+[subgraphs.network]
+# Query URL for the Graph Network subgraph.
+query_url = "${NETWORK_SUBGRAPH_ENDPOINT}"
+# Optional, Auth token will used a "bearer auth"
+# query_auth_token = "super-secret"
+
+# Optional, deployment to look for in the local `graph-node`, if locally indexed.
+# Locally indexing the subgraph is recommended.
+# NOTE: Use `query_url` or `deployment_id` only
+deployment_id = "${NETWORK_SUBGRAPH_DEPLOYMENT}"
+# Refreshing interval for the Graph contracts information from the Graph Network
+# subgraph.
+syncing_interval_secs = ${NETWORK_SUBGRAPHS_SYNCING_INTERVAL_SECS}
+# Amount of time to keep treating an allocation as active after it has been closed.
+# So that we can keep serving queries while the information about the allocation closure
+# propagates to all the consumers.
+recently_closed_allocation_buffer_secs = ${NETWORK_SUBGRAPHS_RECENTLY_CLOSED_ALLOCATION_BUFFER_SECS}
+
+[subgraphs.escrow]
+# NOTE: It is heavily recomended to use both `query_url` and `deployment_id`,
+# Query URL for the Escrow subgraph.
+query_url = "${ESCROW_SUBGRAPH_ENDPOINT}"
+# Optional, Auth token will used a "bearer auth"
+# query_auth_token = "super-secret"
+
+# Optional, deployment to look for in the local `graph-node`, if locally indexed.
+# Locally indexing the subgraph is recommended.
+deployment_id = "${ESCROW_SUBGRAPH_DEPLOYMENT}"
+# Refreshing interval for the Escrow contracts information from the Escrow subgraph.
+syncing_interval_secs = ${ESCROW_SUBGRAPHS_SYNCING_INTERVAL_SECS}
+
+[blockchain]
+# The chain ID of the network that the graph network is running on
+chain_id = ${BLOCKCHAIN_CHAIN_ID}
+# Contract address of TAP's receipt aggregate voucher (RAV) verifier.
+receipts_verifier_address = "${BLOCKCHAIN_RECEIPTS_VERIFIER_ADDRESS}"
+
+##############################################
+# Specific configurations to indexer-service #
+##############################################
+[service]
+# Host and port to serve the indexer-service query endpoint. This one should have a
+# public ingress.
+host_and_port = "0.0.0.0:${SERVICE_QUERY_PORT}"
+# URL prefix for the query endpoint.
+url_prefix = "${SERVICE_URL_PREFIX}"
+# Serve the network subgraph on `common.server.host_and_port`/network
+serve_network_subgraph = ${SERVICE_SERVE_NETWORK_SUBGRAPH}
+# Serve the escrow subgraph on `common.server.host_and_port`/escrow
+serve_escrow_subgraph = ${SERVICE_SERVE_ESCROW_SUBGRAPH}
+#### OPTIONAL VALUES ####
+## use this to add a layer while serving network/escrow subgraph
+# serve_auth_token = "token"
+## allow queries using this token
+# free_query_auth_token = "i-am-authorized-right?"
+
+
+[service.tap]
+# Maximum value of a receipt, in GRT wei.
+# We need this because a large receipt, especially if it's larger than the RAV request trigger,
+# or worse, the unaggregated receipts limit (tap-agent), can cause the indexer to refuse service
+# to the sender for the duration of RAV request timestamp buffer.
+max_receipt_value_grt = "${SERVICE_TAP_MAX_RECEIPT_VALUE_GRT}" # 0.001 GRT. We use strings to prevent rounding errors
+
+########################################
+# Specific configurations to tap-agent #
+########################################
+[tap]
+# This is the amount of fees you are willing to risk at any given time. For ex.
+# if the sender stops supplying RAVs for long enough and the fees exceed this
+# amount, the indexer-service will stop accepting queries from the sender
+# until the fees are aggregated.
+# NOTE: Use strings for decimal values to prevent rounding errors
+# e.g:
+# max_amount_willing_to_lose_grt = "0.1"
+max_amount_willing_to_lose_grt = ${TAP_MAX_AMOUNT_WILLING_TO_LOSE_GRT}
+
+[tap.rav_request]
+# Trigger value is the amount used to trigger a rav request
+# The dividor is used to define the trigger value of a RAV request using
+# the following formula:
+#
+#   max_amount_willing_to_lose_grt / trigger_value_divisor = trigger_value
+#
+# Must be value greater than 1, but recommended to be 10 or more
+trigger_value_divisor = ${TAP_RAV_REQUEST_TRIGGER_VALUE_DIVISOR}
+# Buffer (in seconds) to add between the current time and the timestamp of the
+# last unaggregated fee when triggering a RAV request.
+timestamp_buffer_secs = ${TAP_RAV_REQUEST_TIMESTAMP_BUFFER_SECS}
+# Timeout (in seconds) for RAV requests.
+request_timeout_secs = ${TAP_RAV_REQUEST_REQUEST_TIMEOUT_SECS}
+# Maximum number of receipts per aggregation request
+max_receipts_per_request = ${TAP_RAV_REQUEST_MAX_RECEIPTS_PER_REQUEST}
+
+[tap.sender_aggregator_endpoints]
+# Key-Value of all senders and their aggregator endpoints
+0xDDE4cfFd3D9052A9cb618fC05a1Cd02be1f2F467 = "https://tap-aggregator.network.thegraph.com"
+
+# [dips]
+# allowed_payers = ["0x3333333333333333333333333333333333333333"]

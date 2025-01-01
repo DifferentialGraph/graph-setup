@@ -10,3 +10,5 @@ envs/indexer.env
 envs/indexer-*.env
 !envs/indexer-template.env
 envs/monitor.env
+envs/monitor-*.env
+!envs/monitor-template.env

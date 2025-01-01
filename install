@@ -1,5 +1,10 @@
 #!/bin/bash -i
+GRAPHDIR="$( cd "$( dirname -- $0 )" && pwd )"
 
+
+# -----------------------------------------------
+# --- PRELIMINARIES -----------------------------
+# -----------------------------------------------
 basics-install() {
     apt update
     apt -y install ca-certificates curl grep git apache2-utils
@@ -47,7 +52,97 @@ edit-var() # file to edit - var to edit - var arg
     sed -i "s/^${2}=.*/${2}=$(echo "${3}" | sed 's/[&/\]/\\&/g')/" ${1}
 }
 
-indexer-env()
+
+# -----------------------------------------------
+# --- GRAPH NODE --------------------------------
+# -----------------------------------------------
+generate-node-config()
+{
+# Datbase
+cat <<EOF >$1
+[store]
+[store.primary]
+connection = "postgresql://${DB_NODE_USER}:${DB_NODE_PASS}@:5432/${DB_NODE_NAME}?host=/var/run/postgresql"
+pool_size = 10
+
+[chains]
+ingestor = "index_node"
+
+EOF
+
+# Chains
+for (( j=0; j<${#CHAIN_NAME[@]}; j++ ));
+do
+if [  "${CHAIN_RPC[$j]%%:*}" == "http" ] || [ "${CHAIN_RPC[$j]%%:*}" == "https" ]; then
+	TRANSPORT="rpc"
+elif [ "${CHAIN_RPC[$j]%%:*}" == "ws" ] || [ "${CHAIN_RPC[$j]%%:*}" == "wss" ]; then 
+	TRANSPORT="ws"
+else
+	{ echo "Error: unknown URL"; return 1; }
+fi
+cat <<EOF >>$1
+[chains.${CHAIN_NAME[$j]}]
+shard = "primary"
+provider = [ { label = "${CHAIN_NAME[$j]}", url = "${CHAIN_RPC[$j]}", transport = "$TRANSPORT", features = ["archive", "traces"] } ]
+
+EOF
+done
+
+# Deployment
+cat <<EOF >>$1
+[deployment]
+[[deployment.rule]]
+indexers = [ "index_node" ]
+
+[general]
+query = "query_node"
+EOF
+}
+
+node-start() {
+    # check and load environment file for graph node
+    [ -f "$GRAPH_DIR/envs/node.env" ] || { echo "Error: user node.env file not found"; return 1; }
+    source $GRAPH_DIR/envs/node.env
+
+    # generate graph node configuration file
+    if ! volume-exists graph-node_config; then
+        docker volume create graph-node_config
+    fi
+    NODE_CONFIG_FILE=/var/lib/docker/volumes/graph-node_config/_data/config.toml
+    generate-node-config $NODE_CONFIG_FILE
+
+    # run graph node service
+    COMPOSE_FILE=$GRAPH_DIR/services/node.yml \
+    COMPOSE_IGNORE_ORPHANS=True \
+    docker compose --env-file $GRAPH_DIR/envs/node.env up -d --force-recreate --build
+
+    # attach graph node to reverse proxy
+    if [ -n  $NODE_HOST ]; then
+        reverseproxy-check || { echo "Error: reverse proxy not running" ; return; }
+        docker network connect reverse-proxy index-node && docker network connect reverse-proxy query-node
+
+        # create whitelist for graph node
+        if [ ! -z $WHITELIST ]; then
+            VHOST_PATH=/var/lib/docker/volumes/reverse-proxy_vhost/_data
+            [ -f "${VHOST_PATH}/thegraph.${NODE_HOST}" ] && rm ${VHOST_PATH}/thegraph.${NODE_HOST}
+            for (( j=0; j<${#WHITELIST[@]}; j++ )); do
+                echo "allow ${WHITELIST[$j]};" >> ${VHOST_PATH}/thegraph.${NODE_HOST}
+            done
+            echo "deny all;" >> ${VHOST_PATH}/thegraph.${NODE_HOST}
+        fi
+    fi
+}
+
+graphnode-install() {
+    whiptail --title "Graph Setup" --yesno "Install graph node?" 8 78 || { echo "User exit"; return; }
+    node-start || { return 1; }
+}
+
+
+# -----------------------------------------------
+# --- GRAPH INDEXER -----------------------------
+# -----------------------------------------------
+generate-indexer-env()
 {
     [ -f "envs/indexer.env" ] || { echo "Error: user indexer.env file not found"; return 1; }
     source envs/indexer.env
@@ -75,8 +170,8 @@ indexer-env()
         edit-var $INDEXER_ENV "SERVICE_QUERY_PORT" "7600"
     fi
 
-    if [ -z $POSTGRES_HOST ]; then
-        edit-var $INDEXER_ENV "POSTGRES_HOST" "${INDEXER_NAME}-postgres-indexer"
+    if [ -z $DB_INDEXER_HOST ]; then
+        edit-var $INDEXER_ENV "DB_INDEXER_HOST" "${INDEXER_NAME}-postgres-indexer"
     fi
 
     case $INDEXER_NETWORK in
@@ -145,132 +240,85 @@ indexer-env()
     esac
 }
 
-node-config()
-{
-# Datbase
-cat <<EOF >$1
-[store]
-[store.primary]
-connection = "postgresql://${DB_NODE_USER}:${DB_NODE_PASS}@:5432/${DB_NODE_NAME}?host=/var/run/postgresql"
-pool_size = 10
+indexer-start() {
+    [ -z $1 ] && { echo "Error: select indexer"; return; }
+    [ -f "$GRAPH_DIR/envs/indexer-$1.env" ] || { echo "Error: user indexer-$1.env file not found"; return 1; }
+    source $GRAPH_DIR/envs/indexer-$1.env
 
-[chains]
-ingestor = "index_node"
-
-EOF
-
-# Chains
-for (( j=0; j<${#CHAIN_NAME[@]}; j++ ));
-do
-if [  "${CHAIN_RPC[$j]%%:*}" == "http" ] || [ "${CHAIN_RPC[$j]%%:*}" == "https" ]; then
-	TRANSPORT="rpc"
-elif [ "${CHAIN_RPC[$j]%%:*}" == "ws" ] || [ "${CHAIN_RPC[$j]%%:*}" == "wss" ]; then 
-	TRANSPORT="ws"
-else
-	{ echo "Error: unknown URL"; return 1; }
-fi
-cat <<EOF >>$1
-[chains.${CHAIN_NAME[$j]}]
-shard = "primary"
-provider = [ { label = "${CHAIN_NAME[$j]}", url = "${CHAIN_RPC[$j]}", transport = "$TRANSPORT", features = ["archive", "traces"] } ]
-
-EOF
-done
-
-# Deployment
-cat <<EOF >>$1
-[deployment]
-[[deployment.rule]]
-indexers = [ "index_node" ]
-
-[general]
-query = "query_node"
-EOF
-}
-
-graphnode-install() {
-    whiptail --title "Graph Setup" --yesno "Install graph node?" 8 78 || { echo "User exit"; return; }
-    [ -f "envs/node.env" ] || { echo "Error: user node.env file not found"; return 1; }
-    source envs/node.env
-
-    docker volume create graph-node_config
-    NODE_CONFIG_FILE=/var/lib/docker/volumes/graph-node_config/_data/config.toml
-    node-config $NODE_CONFIG_FILE
-
-    COMPOSE_FILE=services/node.yml \
-    COMPOSE_IGNORE_ORPHANS=True \
-    docker compose --env-file envs/node.env up -d --force-recreate --build
-
-    for node in "${CHAIN_NAME[@]}"; do
-        [ "$(docker network ls -f name=$node -q)" ] && docker network connect $node index-node && docker network connect $node query-node
-    done
-
-    if [ -n  $NODE_HOST ]; then
-        reverseproxy-check || { echo "Error: reverse proxy not running" ; return; }
-        docker network connect reverse-proxy index-node && docker network connect reverse-proxy query-node
-
-        if [ ! -z $WHITELIST ]; then
-            VHOST_PATH=/var/lib/docker/volumes/reverse-proxy_vhost/_data
-            for (( j=0; j<${#WHITELIST[@]}; j++ )); do
-                echo "allow ${WHITELIST[$j]};" >> ${VHOST_PATH}/thegraph.${NODE_HOST}
-            done
-            echo "deny all;" >> ${VHOST_PATH}/thegraph.${NODE_HOST}
-        fi
+    # create volume for configuration file indexer tap and service
+    if ! volume-exists ${INDEXER_NAME}-indexer_config; then
+        docker volume create ${INDEXER_NAME}-indexer_config
     fi
-}
+    cp $GRAPH_DIR/config/indexer-config.toml /var/lib/docker/volumes/${INDEXER_NAME}-indexer_config/_data
 
-graphindexer-install() {
-    whiptail --title "Graph Setup" --yesno "Install graph indexer?" 8 78 || { echo "User exit"; return; }
-    indexer-env || { echo "Error: could not generate indexer env file"; return 1; }
-
-    COMPOSE_FILE=services/indexer.yml \
+    # start indexer service
+    COMPOSE_FILE=$GRAPH_DIR/services/indexer.yml \
     COMPOSE_IGNORE_ORPHANS=True \
-    docker compose --env-file envs/indexer-$INDEXER_NAME.env up -d --force-recreate --build
-    touch /var/lib/docker/volumes/${INDEXER_NAME}-indexer_cli-history/_data/.bash_history
+    docker compose --env-file $GRAPH_DIR/envs/indexer-$1.env up -d --force-recreate --build
 
+    # generate cli hitory file
+    [ -f /var/lib/docker/volumes/${INDEXER_NAME}-indexer_cli-history/_data/.bash_history ] && touch /var/lib/docker/volumes/${INDEXER_NAME}-indexer_cli-history/_data/.bash_history
+
+    # connect indexer services to graph node
     if [ "$( docker container inspect -f '{{.State.Running}}' index-node )" = "true" ] && [ "$( docker container inspect -f '{{.State.Running}}' query-node )" = "true" ]; then
         docker network connect graph-node $INDEXER_NAME-indexer-service && docker network connect graph-node $INDEXER_NAME-indexer-tap && docker network connect graph-node $INDEXER_NAME-indexer-agent && docker network connect graph-node $INDEXER_NAME-indexer-cli
     fi
 
+    # connect indexer service to reverse proxy
     if [ -n  $INDEXER_HOST ]; then
         reverseproxy-check || { echo "Error: reverse proxy not running" ; return; }
         docker network connect reverse-proxy $INDEXER_NAME-indexer-service
     fi
 }
 
-graphmonitor-install() {
-    whiptail --title "Graph Setup" --yesno "Install graph monitor?" 8 78 || { echo "User exit"; return; }
-    
-    [ -f "envs/monitor.env" ] || { echo "Error: user monitor.env file not found"; return 1; }
-    source envs/monitor.env
-    [ -f "envs/indexer-$MONITOR_INDEXER.env" ] || { echo "Error: user indexer-$MONITOR_INDEXER.env file not found"; return 1; }
-    [ -f "envs/node.env" ] || { echo "Error: user node.env file not found"; return 1; }
-    source envs/node.env
+graphindexer-install() {
+    whiptail --title "Graph Setup" --yesno "Install graph indexer?" 8 78 || { echo "User exit"; return; }
+    generate-indexer-env || { echo "Error: could not generate indexer env file"; return 1; }
 
-    if [ ! -z $MONITOR_HOST ]; then
-        sed -i "s/^GRAFANA_HOST=.*/GRAFANA_HOST=$(echo "dashboard-$MONITOR_INDEXER.$MONITOR_HOST" | sed 's/[&/\]/\\&/g')/" "envs/monitor.env"
-        sed -i "s/^PROMETHEUS_HOST=.*/PROMETHEUS_HOST=$(echo "prometheus-$MONITOR_INDEXER.$MONITOR_HOST" | sed 's/[&/\]/\\&/g')/" "envs/monitor.env"
-    else
-        echo "to do"
-    fi
+    [ -f "$GRAPH_DIR/envs/indexer.env" ] || { echo "Error: user indexer.env file not found"; return 1; }
+    indexer-start $INDEXER_NAME
+}
+
+
+# -----------------------------------------------
+# --- GRAPH MONITOR -----------------------------
+# -----------------------------------------------
+monitor-start() {
+    [ -z $1 ] && { echo "Error: select indexer"; return; }
+
+    [ -f "$GRAPH_DIR/envs/monitor-${1}.env" ] || { echo "Error: user monitor-${1}.env file not found"; return 1; }
+    source $GRAPH_DIR/envs/monitor-${1}.env
+
+    [ -f "$GRAPH_DIR/envs/node.env" ] || { echo "Error: user node.env file not found"; return 1; }
+    source $GRAPH_DIR/envs/node.env
+
     export MONITOR_INDEXER
-    # Prometheus
-    docker volume create ${MONITOR_INDEXER}-monitor_prometheus-config
-    cp prometheus/alert.rules /var/lib/docker/volumes/${MONITOR_INDEXER}-monitor_prometheus-config/_data/alert.rules
-    envsubst < prometheus/prometheus.yml > /var/lib/docker/volumes/${MONITOR_INDEXER}-monitor_prometheus-config/_data/prometheus.yml
 
-    # Grafana
-    docker volume create ${MONITOR_INDEXER}-monitor_grafana-provisioning
-    cp -R grafana/dashboards/ grafana/datasources/ /var/lib/docker/volumes/${MONITOR_INDEXER}-monitor_grafana-provisioning/_data
-    # envsubst < grafana/dashboards/indexing-performance-metrics.json > /var/lib/docker/volumes/${MONITOR_INDEXER}-monitor_grafana-provisioning/_data/dashboards/indexing-performance-metrics.json
+    # create volume for prometheus configuration files
+    if ! volume-exists ${MONITOR_INDEXER}-monitor_prometheus-config; then
+        docker volume create ${MONITOR_INDEXER}-monitor_prometheus-config
+    fi
+    cp $GRAPH_DIR/prometheus/alert.rules /var/lib/docker/volumes/${MONITOR_INDEXER}-monitor_prometheus-config/_data/alert.rules
+    envsubst < $GRAPH_DIR/prometheus/prometheus.yml > /var/lib/docker/volumes/${MONITOR_INDEXER}-monitor_prometheus-config/_data/prometheus.yml
 
-    # Alertmanager
-    docker volume create ${MONITOR_INDEXER}-monitor_alertmanager-config
-    cp alertmanager/config.yml /var/lib/docker/volumes/${MONITOR_INDEXER}-monitor_alertmanager-config/_data
+    # create volume for grafana dashboards and datasoruces
+    if ! volume-exists ${MONITOR_INDEXER}-monitor_grafana-provisioning; then
+        docker volume create ${MONITOR_INDEXER}-monitor_grafana-provisioning
+    else
+        rm -rf /var/lib/docker/volumes/${MONITOR_INDEXER}-monitor_grafana-provisioning/_data/*
+    fi
+    cp -R $GRAPH_DIR/grafana/dashboards/ $GRAPH_DIR/grafana/datasources/ /var/lib/docker/volumes/${MONITOR_INDEXER}-monitor_grafana-provisioning/_data
 
-    COMPOSE_FILE=services/monitor.yml \
+    # create volume for alertmanager configuration file
+    if ! volume-exists ${MONITOR_INDEXER}-monitor_alertmanager-config; then
+        docker volume create ${MONITOR_INDEXER}-monitor_alertmanager-config
+    fi
+    cp $GRAPH_DIR/alertmanager/config.yml /var/lib/docker/volumes/${MONITOR_INDEXER}-monitor_alertmanager-config/_data
+
+    # start monitor services
+    COMPOSE_FILE=$GRAPH_DIR/services/monitor.yml \
     COMPOSE_IGNORE_ORPHANS=True \
-    docker compose --env-file envs/monitor.env --env-file envs/node.env --env-file envs/indexer-$MONITOR_INDEXER.env up -d --force-recreate --build
+    docker compose --env-file $GRAPH_DIR/envs/monitor-${1}.env --env-file $GRAPH_DIR/envs/node.env up -d --force-recreate --build
 
     if [ "$( docker container inspect -f '{{.State.Running}}' index-node )" = "true" ] && [ "$( docker container inspect -f '{{.State.Running}}' query-node )" = "true" ] && [ "$( docker container inspect -f '{{.State.Running}}' postgres-node )" = "true" ]; then
         docker network connect graph-node ${MONITOR_INDEXER}-monitor-prometheus && docker network connect graph-node ${MONITOR_INDEXER}-monitor-grafana
@@ -283,16 +331,34 @@ graphmonitor-install() {
     if [ -n  $MONITOR_HOST ]; then
         reverseproxy-check || { echo "Error: reverse proxy not running" ; return; }
         docker network connect reverse-proxy ${MONITOR_INDEXER}-monitor-prometheus && docker network connect reverse-proxy ${MONITOR_INDEXER}-monitor-grafana
-        htpasswd -c -b /var/lib/docker/volumes/reverse-proxy_htpasswd/_data/prometheus-${MONITOR_INDEXER}.${MONITOR_HOST} $PROMETHEUS_USER $PROMETHEUS_PASS
+        [ -f /var/lib/docker/volumes/reverse-proxy_htpasswd/_data/prometheus-${MONITOR_INDEXER}.${MONITOR_HOST} ] || htpasswd -c -b /var/lib/docker/volumes/reverse-proxy_htpasswd/_data/prometheus-${MONITOR_INDEXER}.${MONITOR_HOST} $PROMETHEUS_USER $PROMETHEUS_PASS
     fi
 
     sleep 5
-    source envs/node.env
     docker exec -it postgres-node psql -U ${DB_NODE_USER} ${DB_NODE_NAME} -c "refresh materialized view info.subgraph_sizes;"
     unset MONITOR_INDEXER
 }
 
+graphmonitor-install() {
+    whiptail --title "Graph Setup" --yesno "Install graph monitor?" 8 78 || { echo "User exit"; return; }
+    
+    [ -f "envs/monitor.env" ] || { echo "Error: user monitor.env file not found"; return 1; }
+    source envs/monitor.env && cp envs/monitor.env envs/monitor-$MONITOR_INDEXER.env
 
+    if [ ! -z $MONITOR_HOST ]; then
+        edit-var "envs/monitor-$MONITOR_INDEXER.env" "GRAFANA_HOST" "dashboard-$MONITOR_INDEXER.$MONITOR_HOST"
+        edit-var "envs/monitor-$MONITOR_INDEXER.env" "PROMETHEUS_HOST" "prometheus-$MONITOR_INDEXER.$MONITOR_HOST"
+    else
+        echo "to do"
+    fi
+
+    monitor-start $MONITOR_INDEXER
+}
+
+
+# -----------------------------------------------
+# --- INSTALLATION -----------------------------
+# -----------------------------------------------
 if [ "${1}" != "--source" ]; then
     apt update && apt install -y whiptail
     whiptail --title "Graph Setup" --yesno "Install graph setup?" 8 78 || { echo "User exit"; exit 1; }
@@ -311,10 +377,9 @@ if [ "${1}" != "--source" ]; then
 
     if ! grep -q "#graph-setup" ~/.bashrc; then
         echo "Modifying .bashrc ..."
-        DIR="$( cd "$( dirname -- $0 )" && pwd )"
         echo -e "\n" >> ~/.bashrc
         echo "#graph-setup" >> ~/.bashrc
-        echo "export GRAPH_DIR=$DIR" >> ~/.bashrc
+        echo "export GRAPH_DIR=$GRAPHDIR" >> ~/.bashrc
         echo 'source $GRAPH_DIR/utils/manage' >> ~/.bashrc
         source ~/.bashrc
     fi

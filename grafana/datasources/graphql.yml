@@ -5,6 +5,6 @@ datasources:
     editable: true
     name: graphql
     orgId: 1
-    type: fifemon-graphql-datasource
-    url: ${SUBGRAPH_ENDPOINT}
+    type: yesoreyeram-infinity-datasource
+    url: http://query-node:8000/subgraphs/id/QmUzRg2HHMpbgf6Q4VHKNDbtBEJnyp5JWCh2gUX9AV6jXv
     version: 1

@@ -7,33 +7,33 @@ x-logging:
 
 volumes:
   prometheus:
-    name: ${INDEXER_NAME}-monitor_prometheus
+    name: ${MONITOR_INDEXER}-monitor_prometheus
   prometheus-config:
     external: true
-    name: ${INDEXER_NAME}-monitor_prometheus-config
+    name: ${MONITOR_INDEXER}-monitor_prometheus-config
   grafana:
-    name: ${INDEXER_NAME}-monitor_grafana
+    name: ${MONITOR_INDEXER}-monitor_grafana
   grafana-provisioning:
     external: true
-    name: ${INDEXER_NAME}-monitor_grafana-provisioning
+    name: ${MONITOR_INDEXER}-monitor_grafana-provisioning
   alertmanager-config:
     external: true
-    name: ${INDEXER_NAME}-monitor_alertmanager-config
+    name: ${MONITOR_INDEXER}-monitor_alertmanager-config
   alertmanager-data:
-    name: ${INDEXER_NAME}-monitor_alertmanager-data
+    name: ${MONITOR_INDEXER}-monitor_alertmanager-data
 
 networks:
   indexer-monitor:
-    name: ${INDEXER_NAME}-monitor
+    name: ${MONITOR_INDEXER}-monitor
 
 services:
   prometheus:
     image: prom/prometheus
-    container_name: ${INDEXER_NAME}-monitor-prometheus
+    container_name: ${MONITOR_INDEXER}-monitor-prometheus
     networks:
       - indexer-monitor
     environment:
-      PROJECT: ${INDEXER_NAME}-monitor
+      PROJECT: ${MONITOR_INDEXER}-monitor
       VIRTUAL_HOST: ${PROMETHEUS_HOST}
       VIRTUAL_PORT: 9090
       LETSENCRYPT_HOST: ${PROMETHEUS_HOST}
@@ -56,11 +56,13 @@ services:
 
   grafana:
     image: grafana/grafana
-    container_name: ${INDEXER_NAME}-monitor-grafana
+    container_name: ${MONITOR_INDEXER}-monitor-grafana
     networks:
       - indexer-monitor
     # depends_on:
     #   - postgres-node
+    env_file:
+      - ../envs/monitor.env
     volumes:
       - grafana:/var/lib/grafana
       - grafana-provisioning:/etc/grafana/provisioning
@@ -69,14 +71,14 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASS}
       GF_USERS_ALLOW_SIGN_UP: false
       GF_SECURITY_DISABLE_BRUTE_FORCE_LOGIN_PROTECTION: true
-      GF_INSTALL_PLUGINS: fifemon-graphql-datasource
-      PROJECT: ${INDEXER_NAME}-monitor
+      GF_INSTALL_PLUGINS: yesoreyeram-infinity-datasource
+      PROJECT: ${MONITOR_INDEXER}-monitor
       POSTGRES_HOST: postgres-node
       POSTGRES_USER: ${DB_NODE_USER}
       POSTGRES_PASS: ${DB_NODE_PASS}
       POSTGRES_DB: ${DB_NODE_NAME}
       SUBGRAPH_ENDPOINT: ${NETWORK_SUBGRAPH_ENDPOINT}
-      PROMETHEUS_HOST: ${INDEXER_NAME}-monitor-prometheus
+      PROMETHEUS_HOST: ${MONITOR_INDEXER}-monitor-prometheus
       VIRTUAL_HOST: ${GRAFANA_HOST}
       VIRTUAL_PORT: 3000
       LETSENCRYPT_HOST: ${GRAFANA_HOST}
@@ -87,7 +89,7 @@ services:
 
   alertmanager:
     image: prom/alertmanager
-    container_name: ${INDEXER_NAME}-monitor-alertmanager
+    container_name: ${MONITOR_INDEXER}-monitor-alertmanager
     networks:
       - indexer-monitor
     volumes:
@@ -103,7 +105,7 @@ services:
 
   node-exporter:
     image: prom/node-exporter
-    container_name: ${INDEXER_NAME}-monitor-node-exporter
+    container_name: ${MONITOR_INDEXER}-monitor-node-exporter
     networks:
       - indexer-monitor
     volumes:
@@ -128,7 +130,7 @@ services:
 
   cadvisor:
     image: gcr.io/cadvisor/cadvisor
-    container_name: ${INDEXER_NAME}-monitor-cadvisor
+    container_name: ${MONITOR_INDEXER}-monitor-cadvisor
     networks:
       - indexer-monitor
     volumes:
@@ -156,7 +158,7 @@ services:
 
   pushgateway:
     image: prom/pushgateway
-    container_name: ${INDEXER_NAME}-monitor-pushgateway
+    container_name: ${MONITOR_INDEXER}-monitor-pushgateway
     networks:
       - indexer-monitor
     expose:

@@ -5,5 +5,5 @@ datasources:
   editable: true
   orgId: 1
   type: prometheus
-  url: http://${PROMETHEUS_HOST}:9090
+  url: http://${MONITOR_INDEXER}-monitor-prometheus:9090
   version: 1

@@ -112,10 +112,10 @@ services:
             dest: "/subgraphs/id/${NETWORK_SUBGRAPH_DEPLOYMENT:-QmUzRg2HHMpbgf6Q4VHKNDbtBEJnyp5JWCh2gUX9AV6jXv}"
           "/epoch":
             port: 8000
-            dest: "/subgraphs/id/${EPOCH_SUBGRAPH_DEPLOYMENT:-QmQfvGfWXh4pxuSykgHUJ8az26xYbxQVrRPso7MADRyuLk}"
+            dest: "/subgraphs/id/${EPOCH_SUBGRAPH_DEPLOYMENT:-QmW26TG5s9myd1gzio9fkgVHEEjZ7u5ktWDpkNePzbusNo}"
           "/epoch/ws":
             port: 8001
-            dest: "/subgraphs/id/${EPOCH_SUBGRAPH_DEPLOYMENT:-QmQfvGfWXh4pxuSykgHUJ8az26xYbxQVrRPso7MADRyuLk}"
+            dest: "/subgraphs/id/${EPOCH_SUBGRAPH_DEPLOYMENT:-QmW26TG5s9myd1gzio9fkgVHEEjZ7u5ktWDpkNePzbusNo}"
           "/escrow":
             port: 8000
             dest: "/subgraphs/id/${ESCROW_SUBGRAPH_DEPLOYMENT:-QmUhiH6Z5xo6o3GNzsSvqpGKLmCt6w5WzKQ1yHk6C8AA8S}"

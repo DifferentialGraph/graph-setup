@@ -1,6 +1,6 @@
 #!/bin/bash -i
-GRAPHDIR="$( cd "$( dirname -- $0 )" && pwd )"
-
+GRAPHDIR="$(cd "$(dirname "${BASH_SOURCE[0]:-${(%):-%x}}")" && pwd)"
+source $GRAPHDIR/utils/docker
 
 # -----------------------------------------------
 # --- PRELIMINARIES -----------------------------
@@ -71,11 +71,11 @@ ingestor = "index_node"
 EOF
 
 # Chains
-for (( j=0; j<${#CHAIN_NAME[@]}; j++ ));
-do
-if [  "${CHAIN_RPC[$j]%%:*}" == "http" ] || [ "${CHAIN_RPC[$j]%%:*}" == "https" ]; then
+[ -n "$ZSH_VERSION" ] && setopt KSH_ARRAYS
+for (( j=0; j<${#CHAIN_NAME[@]}; j++ )); do
+if [ "${CHAIN_RPC[$j]%%:*}" = "http" ] || [ "${CHAIN_RPC[$j]%%:*}" = "https" ]; then
 	TRANSPORT="rpc"
-elif [ "${CHAIN_RPC[$j]%%:*}" == "ws" ] || [ "${CHAIN_RPC[$j]%%:*}" == "wss" ]; then 
+elif [ "${CHAIN_RPC[$j]%%:*}" = "ws" ] || [ "${CHAIN_RPC[$j]%%:*}" = "wss" ]; then 
 	TRANSPORT="ws"
 else
 	{ echo "Error: unknown URL"; return 1; }
@@ -101,8 +101,8 @@ EOF
 
 node-start() {
     # check and load environment file for graph node
-    [ -f "$GRAPH_DIR/envs/node.env" ] || { echo "Error: user node.env file not found"; return 1; }
-    source $GRAPH_DIR/envs/node.env
+    [ -f "$GRAPHDIR/envs/node.env" ] || { echo "Error: user node.env file not found"; return 1; }
+    source $GRAPHDIR/envs/node.env
 
     # generate graph node configuration file
     if ! volume-exists graph-node_config; then
@@ -112,9 +112,9 @@ node-start() {
     generate-node-config $NODE_CONFIG_FILE
 
     # run graph node service
-    COMPOSE_FILE=$GRAPH_DIR/services/node.yml \
+    COMPOSE_FILE=$GRAPHDIR/services/node.yml \
     COMPOSE_IGNORE_ORPHANS=True \
-    docker compose --env-file $GRAPH_DIR/envs/node.env up -d --force-recreate --build
+    docker compose --env-file $GRAPHDIR/envs/node.env up -d --force-recreate --build
 
     # attach graph node to reverse proxy
     if [ -n  $NODE_HOST ]; then
@@ -144,11 +144,10 @@ graphnode-install() {
 # -----------------------------------------------
 generate-indexer-env()
 {
-    [ -f "envs/indexer.env" ] || { echo "Error: user indexer.env file not found"; return 1; }
-    source envs/indexer.env
-    cp envs/indexer.env envs/indexer-$INDEXER_NAME.env
+    INDEXER_ENV="envs/${1}.env"
 
-    INDEXER_ENV="envs/indexer-$INDEXER_NAME.env"
+    [ -f "${INDEXER_ENV}" ] || { echo "Error: indexer env file not found"; return 1; }
+    source ${INDEXER_ENV}
 
     if [ ! -z $INDEXER_HOST ]; then
         edit-var $INDEXER_ENV "PUBLIC_INDEXER_URL" "https://index-$INDEXER_NAME.$INDEXER_HOST/"
@@ -178,16 +177,20 @@ generate-indexer-env()
         "arbitrum-one")
             edit-var $INDEXER_ENV "NETWORK_PROVIDER" "$TXN_RPC_MAIN"
 
-            edit-var $INDEXER_ENV "NETWORK_SUBGRAPH_DEPLOYMENT" "QmUzRg2HHMpbgf6Q4VHKNDbtBEJnyp5JWCh2gUX9AV6jXv"
+            edit-var $INDEXER_ENV "NETWORK_SUBGRAPH_DEPLOYMENT" "QmdKXcBUHR3UyURqVRQHu1oV6VUkBrhi2vNvMx3bNDnUCc"
             if [ -z $NETWORK_SUBGRAPH_ENDPOINT ]; then
                 edit-var $INDEXER_ENV "NETWORK_SUBGRAPH_ENDPOINT" "https://gateway-arbitrum.network.thegraph.com/api/$APIKEY/subgraphs/id/DZz4kDTdmzWLWsV373w2bSmoar3umKKH9y82SUKr5qmp"
             fi
 
+            edit-var $INDEXER_ENV "TAP_SUBGRAPH_DEPLOYMENT" "QmUhiH6Z5xo6o3GNzsSvqpGKLmCt6w5WzKQ1yHk6C8AA8S"
             if [ -z $TAP_SUBGRAPH_ENDPOINT ]; then
                 edit-var $INDEXER_ENV "TAP_SUBGRAPH_ENDPOINT" "https://gateway-arbitrum.network.thegraph.com/api/$APIKEY/subgraphs/id/4sukbNVTzGELnhdnpyPqsf1QqtzNHEYKKmJkgaT8z6M1"
             fi
 
-            edit-var $INDEXER_ENV "EPOCH_SUBGRAPH_ENDPOINT" "https://gateway-arbitrum.network.thegraph.com/api/$APIKEY/subgraphs/id/4KFYqUWRTZQ9gn7GPHC6YQ2q15chJfVrX43ezYcwkgxB"
+            edit-var $INDEXER_ENV "EPOCH_SUBGRAPH_DEPLOYMENT" "QmW26TG5s9myd1gzio9fkgVHEEjZ7u5ktWDpkNePzbusNo"
+            if [ -z $EPOCH_SUBGRAPH_ENDPOINT ]; then
+                edit-var $INDEXER_ENV "EPOCH_SUBGRAPH_ENDPOINT" "https://gateway-arbitrum.network.thegraph.com/api/$APIKEY/subgraphs/id/4KFYqUWRTZQ9gn7GPHC6YQ2q15chJfVrX43ezYcwkgxB"
+            fi
 
             edit-var $INDEXER_ENV "DAI_CONTRACT" "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
 
@@ -203,35 +206,43 @@ generate-indexer-env()
             fi
 
             edit-var $INDEXER_ENV "BLOCKCHAIN_RECEIPTS_VERIFIER_ADDRESS" "0x33f9E93266ce0E108fc85DdE2f71dab555A0F05a"
+
+            edit-var $INDEXER_ENV "TAP_SENDER_AGGREGATOR_ENDPOINTS" "\"0xDDE4cfFd3D9052A9cb618fC05a1Cd02be1f2F467 = \"https://tap-aggregator.network.thegraph.com\"\""
             ;;
         "arbitrum-sepolia")
-            edit-var $INDEXER_ENV "NETWORK_PROVIDER" "$TXN_RPC_MAIN"
+            edit-var $INDEXER_ENV "NETWORK_PROVIDER" "$TXN_RPC_TEST"
 
-            edit-var $INDEXER_ENV "NETWORK_SUBGRAPH_DEPLOYMENT" "QmSWxvd8SaQK6qZKJ7xtfxCCGoRzGnoi2WNzmJYYJW9BXY"
+            edit-var $INDEXER_ENV "NETWORK_SUBGRAPH_DEPLOYMENT" "QmXnGVrg6DvscnvJd86aHAPLGyGrkM17weMrAsFAEMmQLL"
             if [ -z $NETWORK_SUBGRAPH_ENDPOINT ]; then
-                edit-var $INDEXER_ENV "NETWORK_SUBGRAPH_ENDPOINT" "https://gateway-arbitrum.network.thegraph.com/api/$APIKEY/subgraphs/id/DZz4kDTdmzWLWsV373w2bSmoar3umKKH9y82SUKr5qmp"
+                edit-var $INDEXER_ENV "NETWORK_SUBGRAPH_ENDPOINT" "https://gateway-arbitrum.network.thegraph.com/api/$APIKEY/subgraphs/id/3xQHhMudr1oh69ut36G2mbzpYmYxwqCeU6wwqyCDCnqV"
             fi
 
+            edit-var $INDEXER_ENV "TAP_SUBGRAPH_DEPLOYMENT" "QmUiLdbsk6c51UMdcNBxsP3KadJpkmp6a3k2NCprR4ZFeM"
             if [ -z $TAP_SUBGRAPH_ENDPOINT ]; then
-                edit-var $INDEXER_ENV "TAP_SUBGRAPH_ENDPOINT" "https://gateway-arbitrum.network.thegraph.com/api/$APIKEY/subgraphs/id/4sukbNVTzGELnhdnpyPqsf1QqtzNHEYKKmJkgaT8z6M1"
+                edit-var $INDEXER_ENV "TAP_SUBGRAPH_ENDPOINT" "https://gateway-arbitrum.network.thegraph.com/api/$APIKEY/subgraphs/id/7ubx365MiqBH5iUz6XWXWT8PTof5BVAyEzdb8m17RvbD"
             fi
 
-            edit-var $INDEXER_ENV "EPOCH_SUBGRAPH_ENDPOINT" "https://gateway-arbitrum.network.thegraph.com/api/$APIKEY/subgraphs/id/4KFYqUWRTZQ9gn7GPHC6YQ2q15chJfVrX43ezYcwkgxB"
+            edit-var $INDEXER_ENV "EPOCH_SUBGRAPH_DEPLOYMENT" "QmNNn48AU8CZei8sYLXrXABMHkiXAuQDvFaZHYYPryKEvF"
+            if [ -z $EPOCH_SUBGRAPH_ENDPOINT ]; then
+                edit-var $INDEXER_ENV "EPOCH_SUBGRAPH_ENDPOINT" "https://gateway-arbitrum.network.thegraph.com/api/$APIKEY/subgraphs/id/BhnsdeZihU4SuokxZMLF4FQBVJ3jgtZf6v51gHvz3bSS"
+            fi
 
             edit-var $INDEXER_ENV "DAI_CONTRACT" "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
 
-            edit-var $INDEXER_ENV "GATEWAY_ENDPOINT" "https://gateway-arbitrum.network.thegraph.com/"
+            edit-var $INDEXER_ENV "GATEWAY_ENDPOINT" "https://gateway-arbitrum.testnet.thegraph.com/"
 
-            edit-var $INDEXER_ENV "ESCROW_SUBGRAPH_DEPLOYMENT" "QmUhiH6Z5xo6o3GNzsSvqpGKLmCt6w5WzKQ1yHk6C8AA8S"
+            edit-var $INDEXER_ENV "ESCROW_SUBGRAPH_DEPLOYMENT" "QmUiLdbsk6c51UMdcNBxsP3KadJpkmp6a3k2NCprR4ZFeM"
             if [ -z $ESCROW_SUBGRAPH_ENDPOINT ]; then
-                edit-var $INDEXER_ENV "ESCROW_SUBGRAPH_ENDPOINT" "https://gateway-arbitrum.network.thegraph.com/api/$APIKEY/subgraphs/id/4sukbNVTzGELnhdnpyPqsf1QqtzNHEYKKmJkgaT8z6M1"
+                edit-var $INDEXER_ENV "ESCROW_SUBGRAPH_ENDPOINT" "https://gateway-arbitrum.network.thegraph.com/api/$APIKEY/subgraphs/id/7ubx365MiqBH5iUz6XWXWT8PTof5BVAyEzdb8m17RvbD"
             fi
 
             if [ -z $BLOCKCHAIN_CHAIN_ID ]; then
-                edit-var $INDEXER_ENV "BLOCKCHAIN_CHAIN_ID" "42161"
+                edit-var $INDEXER_ENV "BLOCKCHAIN_CHAIN_ID" "421614"
             fi
 
-            edit-var $INDEXER_ENV "BLOCKCHAIN_RECEIPTS_VERIFIER_ADDRESS" "0x33f9E93266ce0E108fc85DdE2f71dab555A0F05a"
+            edit-var $INDEXER_ENV "BLOCKCHAIN_RECEIPTS_VERIFIER_ADDRESS" "0xfC24cE7a4428A6B89B52645243662A02BA734ECF"
+
+            edit-var $INDEXER_ENV "TAP_SENDER_AGGREGATOR_ENDPOINTS" "\"0xC3dDf37906724732FfD748057FEBe23379b0710D = \"https://tap-aggregator.testnet.thegraph.com\"\""
             ;;
         *)
             echo "Error: network not supported." >&2
@@ -241,118 +252,165 @@ generate-indexer-env()
 }
 
 indexer-start() {
-    [ -z $1 ] && { echo "Error: select indexer"; return; }
-    [ -f "$GRAPH_DIR/envs/indexer-$1.env" ] || { echo "Error: user indexer-$1.env file not found"; return 1; }
-    source $GRAPH_DIR/envs/indexer-$1.env
+    [ -z $1 ] && { echo "Error: select indexer env"; return; }
+    [ -f "$GRAPHDIR/envs/$1.env" ] || { echo "Error: user $1.env file not found"; return 1; }
+    source $GRAPHDIR/envs/$1.env
 
     # create volume for configuration file indexer tap and service
     if ! volume-exists ${INDEXER_NAME}-indexer_config; then
         docker volume create ${INDEXER_NAME}-indexer_config
     fi
-    cp $GRAPH_DIR/config/indexer-config.toml /var/lib/docker/volumes/${INDEXER_NAME}-indexer_config/_data
+    cp $GRAPHDIR/config/indexer-config.toml /var/lib/docker/volumes/${INDEXER_NAME}-indexer_config/_data
 
     # start indexer service
-    COMPOSE_FILE=$GRAPH_DIR/services/indexer.yml \
+    COMPOSE_FILE=$GRAPHDIR/services/indexer.yml \
     COMPOSE_IGNORE_ORPHANS=True \
-    docker compose --env-file $GRAPH_DIR/envs/indexer-$1.env up -d --force-recreate --build
+    INDEXER_ENV=$GRAPHDIR/envs/${1}.env \
+    docker compose --env-file $GRAPHDIR/envs/$1.env up -d --force-recreate --build
 
     # generate cli hitory file
     [ -f /var/lib/docker/volumes/${INDEXER_NAME}-indexer_cli-history/_data/.bash_history ] && touch /var/lib/docker/volumes/${INDEXER_NAME}-indexer_cli-history/_data/.bash_history
 
+    sleep 5s
+
     # connect indexer services to graph node
     if [ "$( docker container inspect -f '{{.State.Running}}' index-node )" = "true" ] && [ "$( docker container inspect -f '{{.State.Running}}' query-node )" = "true" ]; then
-        docker network connect graph-node $INDEXER_NAME-indexer-service && docker network connect graph-node $INDEXER_NAME-indexer-tap && docker network connect graph-node $INDEXER_NAME-indexer-agent && docker network connect graph-node $INDEXER_NAME-indexer-cli
+        nets=$(container-networks $INDEXER_NAME-indexer-service)
+        [[ ! ${nets[@]} =~ "graph-node" ]] && docker network connect graph-node $INDEXER_NAME-indexer-service
+        nets=$(container-networks $INDEXER_NAME-indexer-tap)
+        [[ ! ${nets[@]} =~ "graph-node" ]] && docker network connect graph-node $INDEXER_NAME-indexer-tap
+        nets=$(container-networks $INDEXER_NAME-indexer-agent)
+        [[ ! ${nets[@]} =~ "graph-node" ]] && docker network connect graph-node $INDEXER_NAME-indexer-agent
+        nets=$(container-networks $INDEXER_NAME-indexer-cli)
+        [[ ! ${nets[@]} =~ "graph-node" ]] && docker network connect graph-node $INDEXER_NAME-indexer-cli
     fi
 
     # connect indexer service to reverse proxy
     if [ -n  $INDEXER_HOST ]; then
         reverseproxy-check || { echo "Error: reverse proxy not running" ; return; }
-        docker network connect reverse-proxy $INDEXER_NAME-indexer-service
+        nets=$(container-networks $INDEXER_NAME-indexer-service)
+        [[ ! ${nets[@]} =~ "reverse-proxy" ]] && docker network connect reverse-proxy $INDEXER_NAME-indexer-service
     fi
 }
 
 graphindexer-install() {
     whiptail --title "Graph Setup" --yesno "Install graph indexer?" 8 78 || { echo "User exit"; return; }
-    generate-indexer-env || { echo "Error: could not generate indexer env file"; return 1; }
-
-    [ -f "$GRAPH_DIR/envs/indexer.env" ] || { echo "Error: user indexer.env file not found"; return 1; }
-    indexer-start $INDEXER_NAME
+    INDEXER_ENV_NAME=$(whiptail --title "Graph Setup" --inputbox "Enter indexer environment name" 8 78 "indexer" 3>&1 1>&2 2>&3)
+    generate-indexer-env $INDEXER_ENV_NAME || { echo "Error: could not generate indexer env file"; return 1; }
+    indexer-start $INDEXER_ENV_NAME
 }
 
 
 # -----------------------------------------------
 # --- GRAPH MONITOR -----------------------------
 # -----------------------------------------------
+gen-prometheus-config() {
+if [ -n "${INDEX_NODE_URL}" ]; then
+cat <<EOF >>$1
+
+  - job_name: 'index-node'
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['${INDEX_NODE_URL}']
+EOF
+fi
+
+if [ -n "${QUERY_NODE_URL}" ]; then
+cat <<EOF >>$1
+
+  - job_name: 'query-node'
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['${QUERY_NODE_URL}']
+EOF
+fi
+
+if [ -n "${INDEXER_SERVICE_URL}" ]; then
+cat <<EOF >>$1
+
+  - job_name: 'indexer-service'
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['${INDEXER_SERVICE_URL}']
+EOF
+fi
+
+if [ -n "${INDEXER_TAP_URL}" ]; then
+cat <<EOF >>$1
+
+  - job_name: 'indexer-tap'
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['${INDEXER_TAP_URL}']
+EOF
+fi
+
+if [ -n "${INDEXER_AGENT_URL}" ]; then
+cat <<EOF >>$1
+
+  - job_name: 'indexer-agent'
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['${INDEXER_AGENT_URL}']
+EOF
+fi
+}
+
 monitor-start() {
-    [ -z $1 ] && { echo "Error: select indexer"; return; }
-
-    [ -f "$GRAPH_DIR/envs/monitor-${1}.env" ] || { echo "Error: user monitor-${1}.env file not found"; return 1; }
-    source $GRAPH_DIR/envs/monitor-${1}.env
-
-    [ -f "$GRAPH_DIR/envs/node.env" ] || { echo "Error: user node.env file not found"; return 1; }
-    source $GRAPH_DIR/envs/node.env
-
-    export MONITOR_INDEXER
+    [ -f "$GRAPHDIR/envs/monitor.env" ] || { echo "Error: user monitor.env file not found"; return 1; }
+    source $GRAPHDIR/envs/monitor.env
 
     # create volume for prometheus configuration files
-    if ! volume-exists ${MONITOR_INDEXER}-monitor_prometheus-config; then
-        docker volume create ${MONITOR_INDEXER}-monitor_prometheus-config
+    if ! volume-exists graph-monitor_prometheus-config; then
+        docker volume create graph-monitor_prometheus-config
     fi
-    cp $GRAPH_DIR/prometheus/alert.rules /var/lib/docker/volumes/${MONITOR_INDEXER}-monitor_prometheus-config/_data/alert.rules
-    envsubst < $GRAPH_DIR/prometheus/prometheus.yml > /var/lib/docker/volumes/${MONITOR_INDEXER}-monitor_prometheus-config/_data/prometheus.yml
+    cp $GRAPHDIR/prometheus/alert.rules /var/lib/docker/volumes/graph-monitor_prometheus-config/_data/alert.rules
+    # envsubst < $GRAPHDIR/prometheus/prometheus.yml > /var/lib/docker/volumes/graph-monitor_prometheus-config/_data/prometheus.yml
+    PROMETHEUS_CONFIG="/var/lib/docker/volumes/graph-monitor_prometheus-config/_data/prometheus.yml"
+    cp $GRAPHDIR/prometheus/prometheus.yml $PROMETHEUS_CONFIG
+    gen-prometheus-config $PROMETHEUS_CONFIG
 
     # create volume for grafana dashboards and datasoruces
-    if ! volume-exists ${MONITOR_INDEXER}-monitor_grafana-provisioning; then
-        docker volume create ${MONITOR_INDEXER}-monitor_grafana-provisioning
+    if ! volume-exists graph-monitor_grafana-provisioning; then
+        docker volume create graph-monitor_grafana-provisioning
     else
-        rm -rf /var/lib/docker/volumes/${MONITOR_INDEXER}-monitor_grafana-provisioning/_data/*
+        rm -rf /var/lib/docker/volumes/graph-monitor_grafana-provisioning/_data/*
     fi
-    cp -R $GRAPH_DIR/grafana/dashboards/ $GRAPH_DIR/grafana/datasources/ /var/lib/docker/volumes/${MONITOR_INDEXER}-monitor_grafana-provisioning/_data
+    cp -R $GRAPHDIR/grafana/dashboards/ $GRAPHDIR/grafana/datasources/ /var/lib/docker/volumes/graph-monitor_grafana-provisioning/_data
 
     # create volume for alertmanager configuration file
-    if ! volume-exists ${MONITOR_INDEXER}-monitor_alertmanager-config; then
-        docker volume create ${MONITOR_INDEXER}-monitor_alertmanager-config
+    if ! volume-exists graph-monitor_alertmanager-config; then
+        docker volume create graph-monitor_alertmanager-config
     fi
-    cp $GRAPH_DIR/alertmanager/config.yml /var/lib/docker/volumes/${MONITOR_INDEXER}-monitor_alertmanager-config/_data
+    cp $GRAPHDIR/alertmanager/config.yml /var/lib/docker/volumes/graph-monitor_alertmanager-config/_data
 
     # start monitor services
-    COMPOSE_FILE=$GRAPH_DIR/services/monitor.yml \
+    COMPOSE_FILE=$GRAPHDIR/services/monitor.yml \
     COMPOSE_IGNORE_ORPHANS=True \
-    docker compose --env-file $GRAPH_DIR/envs/monitor-${1}.env --env-file $GRAPH_DIR/envs/node.env up -d --force-recreate --build
+    docker compose --env-file $GRAPHDIR/envs/monitor.env up -d --force-recreate --build
 
-    if [ "$( docker container inspect -f '{{.State.Running}}' index-node )" = "true" ] && [ "$( docker container inspect -f '{{.State.Running}}' query-node )" = "true" ] && [ "$( docker container inspect -f '{{.State.Running}}' postgres-node )" = "true" ]; then
-        docker network connect graph-node ${MONITOR_INDEXER}-monitor-prometheus && docker network connect graph-node ${MONITOR_INDEXER}-monitor-grafana
+    if [ -n "${NODE_NETWORK}" ]; then
+        docker network connect ${NODE_NETWORK} graph-monitor-prometheus && docker network connect ${NODE_NETWORK} graph-monitor-grafana
     fi
 
-    if [ "$( docker container inspect -f '{{.State.Running}}' ${MONITOR_INDEXER}-indexer-service )" = "true" ]; then
-        docker network connect ${MONITOR_INDEXER}-indexer ${MONITOR_INDEXER}-monitor-prometheus
+    if [ -n "${INDEXER_NETWORK}" ]; then
+        echo $INDEXER_NETWORK
+        docker network connect ${INDEXER_NETWORK} graph-monitor-prometheus
     fi
 
-    if [ -n  $MONITOR_HOST ]; then
+    if [ -n "${MONITOR_HOST}" ]; then
         reverseproxy-check || { echo "Error: reverse proxy not running" ; return; }
-        docker network connect reverse-proxy ${MONITOR_INDEXER}-monitor-prometheus && docker network connect reverse-proxy ${MONITOR_INDEXER}-monitor-grafana
-        [ -f /var/lib/docker/volumes/reverse-proxy_htpasswd/_data/prometheus-${MONITOR_INDEXER}.${MONITOR_HOST} ] || htpasswd -c -b /var/lib/docker/volumes/reverse-proxy_htpasswd/_data/prometheus-${MONITOR_INDEXER}.${MONITOR_HOST} $PROMETHEUS_USER $PROMETHEUS_PASS
+        docker network connect reverse-proxy graph-monitor-prometheus && docker network connect reverse-proxy graph-monitor-grafana
+        [ -f /var/lib/docker/volumes/reverse-proxy_htpasswd/_data/${PROMETHEUS_HOST:-prometheus.${MONITOR_HOST}} ] || htpasswd -c -b /var/lib/docker/volumes/reverse-proxy_htpasswd/_data/${PROMETHEUS_HOST:-prometheus.${MONITOR_HOST}} $PROMETHEUS_USER $PROMETHEUS_PASS
     fi
 
-    sleep 5
-    docker exec -it postgres-node psql -U ${DB_NODE_USER} ${DB_NODE_NAME} -c "refresh materialized view info.subgraph_sizes;"
-    unset MONITOR_INDEXER
+    # sleep 5
+    # docker exec -it ${DB_NODE_URL} psql -U ${DB_NODE_USER} ${DB_NODE_NAME} -c "refresh materialized view info.subgraph_sizes;"
 }
 
 graphmonitor-install() {
     whiptail --title "Graph Setup" --yesno "Install graph monitor?" 8 78 || { echo "User exit"; return; }
-    
-    [ -f "envs/monitor.env" ] || { echo "Error: user monitor.env file not found"; return 1; }
-    source envs/monitor.env && cp envs/monitor.env envs/monitor-$MONITOR_INDEXER.env
-
-    if [ ! -z $MONITOR_HOST ]; then
-        edit-var "envs/monitor-$MONITOR_INDEXER.env" "GRAFANA_HOST" "dashboard-$MONITOR_INDEXER.$MONITOR_HOST"
-        edit-var "envs/monitor-$MONITOR_INDEXER.env" "PROMETHEUS_HOST" "prometheus-$MONITOR_INDEXER.$MONITOR_HOST"
-    else
-        echo "to do"
-    fi
-
-    monitor-start $MONITOR_INDEXER
+    monitor-start
 }
 
 

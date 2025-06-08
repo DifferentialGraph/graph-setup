@@ -5,10 +5,5 @@ nginx-proxy/htpasswd/
 config-*.toml
 prometheus-*
 
-envs/node.env
-envs/indexer.env
-envs/indexer-*.env
-!envs/indexer-template.env
-envs/monitor.env
-envs/monitor-*.env
-!envs/monitor-template.env
+envs/*.env
+!envs/*-template.env

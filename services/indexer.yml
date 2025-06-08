@@ -25,7 +25,7 @@ networks:
 
 services:
   indexer-agent:
-    image: ghcr.io/graphprotocol/indexer-agent:${INDEXER_AGENT_VERSION}
+    image: ghcr.io/graphprotocol/indexer-agent:${INDEXER_AGENT_VERSION:-v0.23.5}
     container_name: ${INDEXER_NAME}-indexer-agent
     networks:
       - indexer
@@ -48,7 +48,9 @@ services:
       INDEXER_AGENT_ALLOCATION_MANAGEMENT: ${ALLOCATION_MANAGEMENT}
       INDEXER_AGENT_NETWORK_SUBGRAPH_DEPLOYMENT: ${NETWORK_SUBGRAPH_DEPLOYMENT}
       INDEXER_AGENT_NETWORK_SUBGRAPH_ENDPOINT: ${NETWORK_SUBGRAPH_ENDPOINT}
+      INDEXER_AGENT_TAP_SUBGRAPH_DEPLOYMENT: ${TAP_SUBGRAPH_DEPLOYMENT}
       INDEXER_AGENT_TAP_SUBGRAPH_ENDPOINT: ${TAP_SUBGRAPH_ENDPOINT}
+      INDEXER_AGENT_EPOCH_SUBGRAPH_DEPLOYMENT: ${EPOCH_SUBGRAPH_DEPLOYMENT}
       INDEXER_AGENT_EPOCH_SUBGRAPH_ENDPOINT: ${EPOCH_SUBGRAPH_ENDPOINT}
       INDEXER_AGENT_REBATE_CLAIM_THRESHOLD: ${REBATE_CLAIM_THRESHOLD}
       INDEXER_AGENT_REBATE_CLAIM_BATCH_THRESHOLD: ${REBATE_CLAIM_BATCH_THRESHOLD}
@@ -70,12 +72,12 @@ services:
     logging: *default-logging
 
   indexer-service:
-    image: ghcr.io/graphprotocol/indexer-service-rs:${INDEXER_SERVICE_VERSION}
+    image: ghcr.io/graphprotocol/indexer-service-rs:${INDEXER_SERVICE_VERSION:-v1.4.0}
     container_name: ${INDEXER_NAME}-indexer-service
     depends_on:
       - postgres-indexer
     env_file:
-      - ../envs/indexer-${INDEXER_NAME}.env
+      - ${INDEXER_ENV}
     volumes:
       - config:/root/.config
     command: >
@@ -94,14 +96,14 @@ services:
     logging: *default-logging
 
   indexer-tap:
-    image: ghcr.io/graphprotocol/indexer-tap-agent:${INDEXER_TAP_VERSION}
+    image: ghcr.io/graphprotocol/indexer-tap-agent:${INDEXER_TAP_VERSION:-v1.8.0}
     container_name: ${INDEXER_NAME}-indexer-tap
     networks:
       - indexer
     depends_on:
       - postgres-indexer
     env_file:
-      - ../envs/indexer-${INDEXER_NAME}.env
+      - ${INDEXER_ENV}
     volumes:
       - config:/root/.config
     command: >
@@ -117,7 +119,7 @@ services:
   indexer-cli:
     build:
       args:
-        VERSION: ${INDEXER_CLI_VERSION}
+        VERSION: ${INDEXER_CLI_VERSION:-v0.23.5}
         INDEXER_NAME: ${INDEXER_NAME}
       context: ../cli
       dockerfile: Dockerfile
@@ -134,7 +136,7 @@ services:
     logging: *default-logging
 
   postgres-indexer:
-    image: postgres:${DB_INDEXER_VERSION}
+    image: postgres:${DB_INDEXER_VERSION:-16.4}
     container_name: ${INDEXER_NAME}-postgres-indexer
     shm_size: 1gb
     networks:

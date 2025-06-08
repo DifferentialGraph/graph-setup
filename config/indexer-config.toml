@@ -142,6 +142,8 @@ max_receipts_per_request = ${TAP_RAV_REQUEST_MAX_RECEIPTS_PER_REQUEST}
 [tap.sender_aggregator_endpoints]
 # Key-Value of all senders and their aggregator endpoints
 0xDDE4cfFd3D9052A9cb618fC05a1Cd02be1f2F467 = "https://tap-aggregator.network.thegraph.com"
+# 0xC3dDf37906724732FfD748057FEBe23379b0710D = "https://tap-aggregator.testnet.thegraph.com"
+# ${TAP_SENDER_AGGREGATOR_ENDPOINTS}
 
 # [dips]
 # allowed_payers = ["0x3333333333333333333333333333333333333333"]

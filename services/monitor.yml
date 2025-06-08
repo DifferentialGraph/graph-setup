@@ -7,36 +7,35 @@ x-logging:
 
 volumes:
   prometheus:
-    name: ${MONITOR_INDEXER}-monitor_prometheus
+    name: graph-monitor_prometheus
   prometheus-config:
     external: true
-    name: ${MONITOR_INDEXER}-monitor_prometheus-config
+    name: graph-monitor_prometheus-config
   grafana:
-    name: ${MONITOR_INDEXER}-monitor_grafana
+    name: graph-monitor_grafana
   grafana-provisioning:
     external: true
-    name: ${MONITOR_INDEXER}-monitor_grafana-provisioning
+    name: graph-monitor_grafana-provisioning
   alertmanager-config:
     external: true
-    name: ${MONITOR_INDEXER}-monitor_alertmanager-config
+    name: graph-monitor_alertmanager-config
   alertmanager-data:
-    name: ${MONITOR_INDEXER}-monitor_alertmanager-data
+    name: graph-monitor_alertmanager-data
 
 networks:
-  indexer-monitor:
-    name: ${MONITOR_INDEXER}-monitor
+  graph-monitor:
+    name: graph-monitor
 
 services:
   prometheus:
     image: prom/prometheus
-    container_name: ${MONITOR_INDEXER}-monitor-prometheus
+    container_name: graph-monitor-prometheus
     networks:
-      - indexer-monitor
+      - graph-monitor
     environment:
-      PROJECT: ${MONITOR_INDEXER}-monitor
-      VIRTUAL_HOST: ${PROMETHEUS_HOST}
+      VIRTUAL_HOST: ${PROMETHEUS_HOST:-prometheus.$MONITOR_HOST}
       VIRTUAL_PORT: 9090
-      LETSENCRYPT_HOST: ${PROMETHEUS_HOST}
+      LETSENCRYPT_HOST: ${PROMETHEUS_HOST:-prometheus.$MONITOR_HOST}
     volumes:
       - prometheus-config:/etc/prometheus
       - prometheus:/prometheus
@@ -56,13 +55,9 @@ services:
 
   grafana:
     image: grafana/grafana
-    container_name: ${MONITOR_INDEXER}-monitor-grafana
+    container_name: graph-monitor-grafana
     networks:
-      - indexer-monitor
-    # depends_on:
-    #   - postgres-node
-    env_file:
-      - ../envs/monitor.env
+      - graph-monitor
     volumes:
       - grafana:/var/lib/grafana
       - grafana-provisioning:/etc/grafana/provisioning
@@ -72,16 +67,15 @@ services:
       GF_USERS_ALLOW_SIGN_UP: false
       GF_SECURITY_DISABLE_BRUTE_FORCE_LOGIN_PROTECTION: true
       GF_INSTALL_PLUGINS: yesoreyeram-infinity-datasource
-      PROJECT: ${MONITOR_INDEXER}-monitor
-      POSTGRES_HOST: postgres-node
+      POSTGRES_HOST: ${DB_NODE_URL}
       POSTGRES_USER: ${DB_NODE_USER}
       POSTGRES_PASS: ${DB_NODE_PASS}
       POSTGRES_DB: ${DB_NODE_NAME}
       SUBGRAPH_ENDPOINT: ${NETWORK_SUBGRAPH_ENDPOINT}
-      PROMETHEUS_HOST: ${MONITOR_INDEXER}-monitor-prometheus
-      VIRTUAL_HOST: ${GRAFANA_HOST}
+      PROMETHEUS_HOST: graph-monitor-prometheus
+      VIRTUAL_HOST: ${GRAFANA_HOST:-dashboard.$MONITOR_HOST}
       VIRTUAL_PORT: 3000
-      LETSENCRYPT_HOST: ${GRAFANA_HOST}
+      LETSENCRYPT_HOST: ${GRAFANA_HOST:-dashboard.$MONITOR_HOST}
     expose:
       - 3000
     restart: unless-stopped
@@ -89,9 +83,9 @@ services:
 
   alertmanager:
     image: prom/alertmanager
-    container_name: ${MONITOR_INDEXER}-monitor-alertmanager
+    container_name: graph-monitor-alertmanager
     networks:
-      - indexer-monitor
+      - graph-monitor
     volumes:
       - alertmanager-config:/etc/alertmanager
       - alertmanager-data:/alertmanager
@@ -105,13 +99,12 @@ services:
 
   node-exporter:
     image: prom/node-exporter
-    container_name: ${MONITOR_INDEXER}-monitor-node-exporter
+    container_name: graph-monitor-node-exporter
     networks:
-      - indexer-monitor
+      - graph-monitor
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
-      # - /:/rootfs:ro
       - type: bind
         source: /
         target: /rootfs
@@ -130,11 +123,10 @@ services:
 
   cadvisor:
     image: gcr.io/cadvisor/cadvisor
-    container_name: ${MONITOR_INDEXER}-monitor-cadvisor
+    container_name: graph-monitor-cadvisor
     networks:
-      - indexer-monitor
+      - graph-monitor
     volumes:
-      # - /:/rootfs:ro
       - type: bind
         source: /
         target: /rootfs
@@ -143,14 +135,13 @@ services:
           propagation: rslave      
       - /var/run:/var/run:rw
       - /sys:/sys:ro
-      # - /var/lib/docker:/var/lib/docker:ro
       - type: bind
         source: /var/lib/docker/
         target: /var/lib/docker
         read_only: true
         bind:
           propagation: rslave
-      - /cgroup:/cgroup:ro #doesn't work on MacOS only for Linux
+      - /cgroup:/cgroup:ro
     expose:
       - 8080
     restart: unless-stopped
@@ -158,9 +149,9 @@ services:
 
   pushgateway:
     image: prom/pushgateway
-    container_name: ${MONITOR_INDEXER}-monitor-pushgateway
+    container_name: graph-monitor-pushgateway
     networks:
-      - indexer-monitor
+      - graph-monitor
     expose:
       - 9091
     restart: unless-stopped

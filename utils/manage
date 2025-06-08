@@ -1,53 +1,54 @@
 #!/bin/bash
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-. $DIR/docker
-. $GRAPH_DIR/install --source
+source $GRAPH_DIR/install --source
 
 graph-monitor() {
-    # check if container running
-    if [ -z "$( docker ps | grep $1-indexer-cli )" ]; then
-        echo "Project not found."
+    if [ "$1" = "node" ]; then
+        [ -z "$( docker ps | grep index-node )" ] && { echo "index-node not runnning."; return; }
+        [ -z "$( docker ps | grep query-node )" ] && { echo "query-node not runnning."; return; }
+
+        SESSIONEXISTS=$(tmux list-sessions | grep graph-node)
+
+        if [ "$SESSIONEXISTS" = "" ];
+        then
+            tmux new-session -d -s graph-node
+
+            tmux rename-window -t 0 'node-cli'
+            tmux send-keys -t "node-cli" "docker exec -it query-node /bin/bash"  C-m
+
+            tmux new-window -t graph-node:1 -n 'index-node'
+            tmux send-keys -t 'index-node' "docker logs index-node --tail 10 -f | pino-pretty -c -t" C-m
+
+            tmux new-window -t graph-node:2 -n 'query-node'
+            tmux send-keys -t 'query-node' "docker logs query-node --tail 10 -f | pino-pretty -c -t" C-m
+        fi
+        tmux attach-session -t graph-node:0
+    elif [ "$1" = "indexer" ]; then
+        [ -z "$2" ] && { echo "Indexer name not provided."; return; }
+        [ -z "$( docker ps | grep $2-indexer-cli )" ] && { echo "Indexer ${2} not found."; return; }
+
+        SESSIONEXISTS=$(tmux list-sessions | grep $2-indexer)
+
+        if [ "$SESSIONEXISTS" = "" ];
+        then
+            tmux new-session -d -s $2-indexer
+
+            tmux rename-window -t 0 'indexer-cli'
+            tmux send-keys -t "indexer-cli" "docker exec -it ${2}-indexer-cli /bin/bash"  C-m
+
+            tmux new-window -t $2-indexer:1 -n 'indexer-agent'
+            tmux send-keys -t 'indexer-agent' "docker logs ${2}-indexer-agent --tail 10 -f | pino-pretty -c -t" C-m
+
+            tmux new-window -t $2-indexer:2 -n 'indexer-service'
+            tmux send-keys -t 'indexer-service' "docker logs ${2}-indexer-service --tail 10 -f | pino-pretty -c -t" C-m
+
+            tmux new-window -t $2-indexer:3 -n 'indexer-tap'
+            tmux send-keys -t 'indexer-tap' "docker logs ${2}-indexer-tap --tail 10 -f | pino-pretty -c -t" C-m
+        fi
+        tmux attach-session -t $2-indexer:0
+    else
+        echo "Option not available."
         return
     fi
-
-    # Check if session name exists
-    SESSIONEXISTS=$(tmux list-sessions | grep $1-indexer)
-
-    # Set up monitoring interface
-    if [ "$SESSIONEXISTS" = "" ];
-    then
-        # Create new session
-        tmux new-session -d -s $1-indexer
-
-        # CLI Docker Container
-        tmux rename-window -t 0 'indexer-cli'
-        tmux send-keys -t "indexer-cli" "docker exec -it ${1}-indexer-cli /bin/bash"  C-m
-
-        # Index-Node Docker Container
-        tmux new-window -t $1-indexer:1 -n 'graphman'
-        tmux send-keys -t "graphman" "docker exec -it query-node /bin/bash"  C-m
-
-        # Indexer Agent Docker Log
-        tmux new-window -t $1-indexer:2 -n 'indexer-agent'
-        tmux send-keys -t 'indexer-agent' "docker logs ${1}-indexer-agent --tail 10 -f | pino-pretty -c -t" C-m
-
-        # Indexer Service Docker Log
-        tmux new-window -t $1-indexer:3 -n 'indexer-service'
-        tmux send-keys -t 'indexer-service' "docker logs ${1}-indexer-service --tail 10 -f | pino-pretty -c -t" C-m
-
-        # Indexer Tap Docker Log
-        tmux new-window -t $1-indexer:4 -n 'indexer-tap'
-        tmux send-keys -t 'indexer-tap' "docker logs ${1}-indexer-tap --tail 10 -f | pino-pretty -c -t" C-m
-
-        # Index Node Docker Log
-        tmux new-window -t $1-indexer:5 -n 'index-node'
-        tmux send-keys -t 'index-node' "docker logs index-node --tail 10 -f | pino-pretty -c -t" C-m
-
-        # Query Node Docker Log
-        tmux new-window -t $1-indexer:6 -n 'query-node'
-        tmux send-keys -t 'query-node' "docker logs query-node --tail 10 -f | pino-pretty -c -t" C-m
-    fi
-    tmux attach-session -t $1-indexer:0
 }
 
 graph-start() {
@@ -61,11 +62,11 @@ graph-start() {
             indexer-start $2
             ;;
         "monitor")
-            monitor-start $2
+            monitor-start
             ;;
         *)
             [ -z $2 ] && { echo "Error: select indexer"; return; }
-            graph-start node && graph-start indexer $2 && graph-start monitor $2
+            graph-start node && graph-start indexer $2 && graph-start monitor
             ;;
     esac
 }
@@ -79,17 +80,15 @@ graph-stop() {
             COMPOSE_FILE=$GRAPH_DIR/services/node.yml docker compose --env-file $GRAPH_DIR/envs/node.env stop
             ;;
         "indexer")
-            [ -z $2 ] && { echo "Error: select indexer"; return; }
-            [ -f "$GRAPH_DIR/envs/indexer-$2.env" ] || { echo "Error: user indexer-$2.env file not found"; return 1; }
-            COMPOSE_FILE=$GRAPH_DIR/services/indexer.yml docker compose --env-file $GRAPH_DIR/envs/indexer-$2.env stop
+            [ -z $2 ] && { echo "Error: select indexer env"; return; }
+            [ -f "$GRAPH_DIR/envs/$2.env" ] || { echo "Error: user $2.env file not found"; return 1; }
+            INDEXER_ENV=$GRAPHDIR/envs/${2}.env \
+            COMPOSE_FILE=$GRAPH_DIR/services/indexer.yml docker compose --env-file $GRAPH_DIR/envs/${2}.env stop
             ;;
         "monitor")
-            [ -z $2 ] && { echo "Error: select indexer"; return; }
             [ -f "$GRAPH_DIR/envs/monitor.env" ] || { echo "Error: user monitor.env file not found"; return 1; }
-            [ -f "$GRAPH_DIR/envs/node.env" ] || { echo "Error: user node.env file not found"; return 1; }
-            [ -f "$GRAPH_DIR/envs/indexer-$2.env" ] || { echo "Error: user indexer-$2.env file not found"; return 1; }
             COMPOSE_FILE=$GRAPH_DIR/services/monitor.yml \
-            docker compose --env-file $GRAPH_DIR/envs/monitor.env --env-file $GRAPH_DIR/envs/node.env --env-file $GRAPH_DIR/envs/indexer-$2.env stop
+            docker compose --env-file $GRAPH_DIR/envs/monitor.env stop
             ;;
         *)
             [ -z $2 ] && { echo "Error: select indexer"; return; }
@@ -101,7 +100,7 @@ graph-stop() {
 graph-restart() {
     [ -z $1 ] && { echo "Error: select one component (node, indexer, monitor, all)"; return; }
 
-    if [ -z $1 ]; then
+    if [ -z $2 ]; then
         graph-stop $1 && graph-start $1
     else
         graph-stop $1 $2 && graph-start $1 $2

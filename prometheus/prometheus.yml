@@ -11,62 +11,38 @@ global:
 rule_files:
   - "alert.rules"
 
-# A scrape configuration containing exactly one endpoint to scrape.
-scrape_configs:
-  - job_name: 'node-exporter'
-    scrape_interval: 5s
-    static_configs:
-      - targets: ['${MONITOR_INDEXER}-monitor-node-exporter:9100']
-
-  - job_name: 'cadvisor'
-    scrape_interval: 5s
-    static_configs:
-      - targets: ['${MONITOR_INDEXER}-monitor-cadvisor:8080']
-
-  - job_name: 'prometheus'
-    scrape_interval: 10s
-    static_configs:
-      - targets: ['${MONITOR_INDEXER}-monitor-prometheus:9090']
-
-  - job_name: 'pushgateway'
-    scrape_interval: 10s
-    honor_labels: true
-    static_configs:
-      - targets: ['${MONITOR_INDEXER}-monitor-pushgateway:9091']
-
-  - job_name: 'index-node'
-    scrape_interval: 5s
-    static_configs:
-      - targets: ['index-node:8040']
-
-  - job_name: 'query-node'
-    scrape_interval: 5s
-    static_configs:
-      - targets: ['query-node:8040']
-
-  - job_name: 'indexer-service'
-    scrape_interval: 5s
-    static_configs:
-      - targets: ['${MONITOR_INDEXER}-indexer-service:7300']
-
-  - job_name: 'indexer-tap'
-    scrape_interval: 5s
-    static_configs:
-      - targets: ['${MONITOR_INDEXER}-indexer-tap:7300']
-
-  - job_name: 'indexer-agent'
-    scrape_interval: 5s
-    static_configs:
-      - targets: ['${MONITOR_INDEXER}-indexer-agent:7300']
-
-  - job_name: 'grafana'
-    scrape_interval: 5s
-    static_configs:
-      - targets: ['${MONITOR_INDEXER}-monitor-grafana:3000']
-
+# Alert Manager
 alerting:
   alertmanagers:
     - scheme: http
       static_configs:
         - targets:
-            - "${MONITOR_INDEXER}-monitor-alertmanager:9093"
+            - "graph-monitor-alertmanager:9093"
+
+# A scrape configuration containing exactly one endpoint to scrape.
+scrape_configs:
+  - job_name: 'grafana'
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['graph-monitor-grafana:3000']
+
+  - job_name: 'node-exporter'
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['graph-monitor-node-exporter:9100']
+
+  - job_name: 'cadvisor'
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['graph-monitor-cadvisor:8080']
+
+  - job_name: 'prometheus'
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['graph-monitor-prometheus:9090']
+
+  - job_name: 'pushgateway'
+    scrape_interval: 10s
+    honor_labels: true
+    static_configs:
+      - targets: ['graph-monitor-pushgateway:9091']

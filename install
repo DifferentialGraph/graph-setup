@@ -124,11 +124,14 @@ node-start() {
         # create whitelist for graph node
         if [ ! -z $WHITELIST ]; then
             VHOST_PATH=/var/lib/docker/volumes/reverse-proxy_vhost/_data
-            [ -f "${VHOST_PATH}/thegraph.${NODE_HOST}" ] && rm ${VHOST_PATH}/thegraph.${NODE_HOST}
+            [ -f "${VHOST_PATH}/query-node.${NODE_HOST}" ] && rm ${VHOST_PATH}/query-node.${NODE_HOST}
+            [ -f "${VHOST_PATH}/index-node.${NODE_HOST}" ] && rm ${VHOST_PATH}/index-node.${NODE_HOST}
             for (( j=0; j<${#WHITELIST[@]}; j++ )); do
-                echo "allow ${WHITELIST[$j]};" >> ${VHOST_PATH}/thegraph.${NODE_HOST}
+                echo "allow ${WHITELIST[$j]};" >> ${VHOST_PATH}/query-node.${NODE_HOST}
+                echo "allow ${WHITELIST[$j]};" >> ${VHOST_PATH}/index-node.${NODE_HOST}
             done
-            echo "deny all;" >> ${VHOST_PATH}/thegraph.${NODE_HOST}
+            echo "deny all;" >> ${VHOST_PATH}/query-node.${NODE_HOST}
+            echo "deny all;" >> ${VHOST_PATH}/index-node.${NODE_HOST}
         fi
     fi
 }
@@ -274,7 +277,8 @@ indexer-start() {
     sleep 5s
 
     # connect indexer services to graph node
-    if [ "$( docker container inspect -f '{{.State.Running}}' index-node )" = "true" ] && [ "$( docker container inspect -f '{{.State.Running}}' query-node )" = "true" ]; then
+    # if [ "$( docker container inspect -f '{{.State.Running}}' index-node )" = "true" ] && [ "$( docker container inspect -f '{{.State.Running}}' query-node )" = "true" ]; then
+    if [ "$(docker network ls | grep graph-node)" ]; then
         nets=$(container-networks $INDEXER_NAME-indexer-service)
         [[ ! ${nets[@]} =~ "graph-node" ]] && docker network connect graph-node $INDEXER_NAME-indexer-service
         nets=$(container-networks $INDEXER_NAME-indexer-tap)

@@ -17,6 +17,14 @@ container-log() {
     docker logs $1 --tail 10 -f
 }
 
+container-exists() {
+    if [ "$(docker ps -a -q -f name=$1)" ]; then
+        return true
+    else
+        return false
+    fi
+}
+
 container-start() {
     if [ -z "$1" ]
     then

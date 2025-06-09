@@ -38,7 +38,7 @@ services:
       postgres_user: ${DB_NODE_USER}
       postgres_pass: ${DB_NODE_PASS}
       postgres_db: ${DB_NODE_NAME}
-      ipfs: https://ipfs.network.thegraph.com/ipfs/
+      ipfs: https://ipfs.thegraph.com/ipfs/
       # ethereum: ${CHAIN_RPC}
       GRAPH_NODE_CONFIG: /root/node-config/config.toml
       GRAPH_LOG: DEBUG
@@ -58,6 +58,14 @@ services:
       ETHEREUM_POLLING_INTERVAL: 500
       GRAPH_ETH_CALL_NO_GAS: 421613,42161
       # GRAPH_MAX_SPEC_VERSION: 1.2.0
+      LETSENCRYPT_HOST: index-node.${NODE_HOST}
+      VIRTUAL_HOST_MULTIPORTS: |-
+        index-node.${NODE_HOST}:
+          "/admin":
+            port: 8020
+          "/status":
+            port: 8030
+            dest: "/graphql"
     volumes:
       - db-socket:/var/run/postgresql
       - node-config:/root/node-config/
@@ -86,7 +94,7 @@ services:
       postgres_user: ${DB_NODE_USER}
       postgres_pass: ${DB_NODE_PASS}
       postgres_db: ${DB_NODE_NAME}
-      ipfs: https://ipfs.network.thegraph.com/ipfs/
+      ipfs: https://ipfs.thegraph.com/ipfs/
       # ethereum: ${CHAIN_RPC}
       GRAPH_NODE_CONFIG: /root/node-config/config.toml
       GRAPH_LOG: DEBUG
@@ -99,15 +107,15 @@ services:
       GRAPH_KILL_IF_UNRESPONSIVE: true
       GRAPH_ALLOW_NON_DETERMINISTIC_FULLTEXT_SEARCH: true
       # GRAPH_MAX_SPEC_VERSION: 1.2.0
-      VIRTUAL_HOST: thegraph.${NODE_HOST}
-      VIRTUAL_PORT: 8000
-      LETSENCRYPT_HOST: thegraph.${NODE_HOST}
+      LETSENCRYPT_HOST: query-node.${NODE_HOST}
       VIRTUAL_HOST_MULTIPORTS: |-
-        thegraph.${NODE_HOST}:
+        query-node.${NODE_HOST}:
           "/":
             port: 8000
+          "/network":
+            port: 8000
             dest: "/subgraphs/id/${NETWORK_SUBGRAPH_DEPLOYMENT:-QmdKXcBUHR3UyURqVRQHu1oV6VUkBrhi2vNvMx3bNDnUCc}"
-          "/ws":
+          "/network/ws":
             port: 8001
             dest: "/subgraphs/id/${NETWORK_SUBGRAPH_DEPLOYMENT:-QmdKXcBUHR3UyURqVRQHu1oV6VUkBrhi2vNvMx3bNDnUCc}"
           "/epoch":
@@ -116,10 +124,10 @@ services:
           "/epoch/ws":
             port: 8001
             dest: "/subgraphs/id/${EPOCH_SUBGRAPH_DEPLOYMENT:-QmW26TG5s9myd1gzio9fkgVHEEjZ7u5ktWDpkNePzbusNo}"
-          "/escrow":
+          "/tap":
             port: 8000
             dest: "/subgraphs/id/${ESCROW_SUBGRAPH_DEPLOYMENT:-QmUhiH6Z5xo6o3GNzsSvqpGKLmCt6w5WzKQ1yHk6C8AA8S}"
-          "/escrow/ws":
+          "/tap/ws":
             port: 8001
             dest: "/subgraphs/id/${ESCROW_SUBGRAPH_DEPLOYMENT:-QmUhiH6Z5xo6o3GNzsSvqpGKLmCt6w5WzKQ1yHk6C8AA8S}"
     volumes:

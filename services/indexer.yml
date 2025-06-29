@@ -25,7 +25,7 @@ networks:
 
 services:
   indexer-agent:
-    image: ghcr.io/graphprotocol/indexer-agent:${INDEXER_AGENT_VERSION:-v0.23.5}
+    image: ghcr.io/graphprotocol/indexer-agent:${INDEXER_AGENT_VERSION:-v0.23.8}
     container_name: ${INDEXER_NAME}-indexer-agent
     networks:
       - indexer
@@ -120,7 +120,7 @@ services:
   indexer-cli:
     build:
       args:
-        VERSION: ${INDEXER_CLI_VERSION:-v0.23.5}
+        VERSION: ${INDEXER_CLI_VERSION:-v0.23.8}
         INDEXER_NAME: ${INDEXER_NAME}
       context: ../cli
       dockerfile: Dockerfile
@@ -137,7 +137,7 @@ services:
     logging: *default-logging
 
   postgres-indexer:
-    image: postgres:${DB_INDEXER_VERSION:-16.4}
+    image: postgres:${DB_INDEXER_VERSION:-17.5}
     container_name: ${INDEXER_NAME}-postgres-indexer
     shm_size: 1gb
     networks:

@@ -20,7 +20,7 @@ networks:
 
 services:
   index-node:
-    image: graphprotocol/graph-node:${NODE_VERSION:-v0.37.0}
+    image: graphprotocol/graph-node:${NODE_VERSION:-v0.39.1}
     container_name: index-node
     networks:
       - graph-node
@@ -73,7 +73,7 @@ services:
     logging: *default-logging
 
   query-node:
-    image: graphprotocol/graph-node:${NODE_VERSION:-v0.37.0}
+    image: graphprotocol/graph-node:${NODE_VERSION:-v0.39.1}
     container_name: query-node
     networks:
       - graph-node
@@ -138,14 +138,14 @@ services:
         driver: "journald"
 
   postgres-node:
-    image: postgres:${DB_NODE_VERSION:-16.4}
+    image: postgres:${DB_NODE_VERSION:-17.5}
     container_name: postgres-node
     shm_size: 1gb
     networks:
       - graph-node
     ports:
       - 127.0.0.1:5432:5432
-    command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements"]
+    # command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements"]
     environment:
       POSTGRES_USER: ${DB_NODE_USER}
       POSTGRES_PASSWORD: ${DB_NODE_PASS}

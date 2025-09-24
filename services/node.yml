@@ -20,7 +20,7 @@ networks:
 
 services:
   index-node:
-    image: graphprotocol/graph-node:${NODE_VERSION:-v0.39.1}
+    image: graphprotocol/graph-node:${NODE_VERSION:-v0.40.0}
     container_name: index-node
     networks:
       - graph-node
@@ -42,6 +42,7 @@ services:
       # ethereum: ${CHAIN_RPC}
       GRAPH_NODE_CONFIG: /root/node-config/config.toml
       GRAPH_LOG: DEBUG
+      # RUST_BACKTRACE: 1
       RUST_LOG: INFO
       # GRAPH_ETH_CALL_GAS: 50000000
       GRAPH_GETH_ETH_CALL_ERRORS: "out of gas"
@@ -73,7 +74,7 @@ services:
     logging: *default-logging
 
   query-node:
-    image: graphprotocol/graph-node:${NODE_VERSION:-v0.39.1}
+    image: graphprotocol/graph-node:${NODE_VERSION:-v0.40.0}
     container_name: query-node
     networks:
       - graph-node
@@ -120,10 +121,10 @@ services:
             dest: "/subgraphs/id/${NETWORK_SUBGRAPH_DEPLOYMENT:-QmdKXcBUHR3UyURqVRQHu1oV6VUkBrhi2vNvMx3bNDnUCc}"
           "/epoch":
             port: 8000
-            dest: "/subgraphs/id/${EPOCH_SUBGRAPH_DEPLOYMENT:-QmW26TG5s9myd1gzio9fkgVHEEjZ7u5ktWDpkNePzbusNo}"
+            dest: "/subgraphs/id/${EPOCH_SUBGRAPH_DEPLOYMENT:-QmeqJqJTZg3xqYaYhvc35JzyB7RBqEyJeexjTBDykvxNkJ}"
           "/epoch/ws":
             port: 8001
-            dest: "/subgraphs/id/${EPOCH_SUBGRAPH_DEPLOYMENT:-QmW26TG5s9myd1gzio9fkgVHEEjZ7u5ktWDpkNePzbusNo}"
+            dest: "/subgraphs/id/${EPOCH_SUBGRAPH_DEPLOYMENT:-QmeqJqJTZg3xqYaYhvc35JzyB7RBqEyJeexjTBDykvxNkJ}"
           "/tap":
             port: 8000
             dest: "/subgraphs/id/${ESCROW_SUBGRAPH_DEPLOYMENT:-QmUhiH6Z5xo6o3GNzsSvqpGKLmCt6w5WzKQ1yHk6C8AA8S}"

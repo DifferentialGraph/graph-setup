@@ -190,7 +190,7 @@ generate-indexer-env()
                 edit-var $INDEXER_ENV "TAP_SUBGRAPH_ENDPOINT" "https://gateway-arbitrum.network.thegraph.com/api/$APIKEY/subgraphs/id/4sukbNVTzGELnhdnpyPqsf1QqtzNHEYKKmJkgaT8z6M1"
             fi
 
-            edit-var $INDEXER_ENV "EPOCH_SUBGRAPH_DEPLOYMENT" "QmW26TG5s9myd1gzio9fkgVHEEjZ7u5ktWDpkNePzbusNo"
+            edit-var $INDEXER_ENV "EPOCH_SUBGRAPH_DEPLOYMENT" "QmeqJqJTZg3xqYaYhvc35JzyB7RBqEyJeexjTBDykvxNkJ"
             if [ -z $EPOCH_SUBGRAPH_ENDPOINT ]; then
                 edit-var $INDEXER_ENV "EPOCH_SUBGRAPH_ENDPOINT" "https://gateway-arbitrum.network.thegraph.com/api/$APIKEY/subgraphs/id/4KFYqUWRTZQ9gn7GPHC6YQ2q15chJfVrX43ezYcwkgxB"
             fi
@@ -274,15 +274,13 @@ indexer-start() {
     # generate cli hitory file
     [ -f /var/lib/docker/volumes/${INDEXER_NAME}-indexer_cli-history/_data/.bash_history ] && touch /var/lib/docker/volumes/${INDEXER_NAME}-indexer_cli-history/_data/.bash_history
 
-    sleep 5s
-
     # connect indexer services to graph node
     # if [ "$( docker container inspect -f '{{.State.Running}}' index-node )" = "true" ] && [ "$( docker container inspect -f '{{.State.Running}}' query-node )" = "true" ]; then
     if [ "$(docker network ls | grep graph-node)" ]; then
         nets=$(container-networks $INDEXER_NAME-indexer-service)
-        [[ ! ${nets[@]} =~ "graph-node" ]] && docker network connect graph-node $INDEXER_NAME-indexer-service
+        [[ ! ${nets[@]} =~ "graph-node" ]] && docker stop $INDEXER_NAME-indexer-service && docker network connect graph-node $INDEXER_NAME-indexer-service && docker start $INDEXER_NAME-indexer-service
         nets=$(container-networks $INDEXER_NAME-indexer-tap)
-        [[ ! ${nets[@]} =~ "graph-node" ]] && docker network connect graph-node $INDEXER_NAME-indexer-tap
+        [[ ! ${nets[@]} =~ "graph-node" ]] && docker stop $INDEXER_NAME-indexer-tap && docker network connect graph-node $INDEXER_NAME-indexer-tap && docker start $INDEXER_NAME-indexer-tap
         nets=$(container-networks $INDEXER_NAME-indexer-agent)
         [[ ! ${nets[@]} =~ "graph-node" ]] && docker network connect graph-node $INDEXER_NAME-indexer-agent
         nets=$(container-networks $INDEXER_NAME-indexer-cli)

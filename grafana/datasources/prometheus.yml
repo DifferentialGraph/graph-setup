@@ -5,5 +5,5 @@ datasources:
   editable: true
   orgId: 1
   type: prometheus
-  url: ${PROMETHEUS_HOST}:9090
+  url: http://${PROMETHEUS_HOST}:9090
   version: 1

@@ -180,9 +180,9 @@ generate-indexer-env()
         "arbitrum-one")
             edit-var $INDEXER_ENV "NETWORK_PROVIDER" "$TXN_RPC_MAIN"
 
-            edit-var $INDEXER_ENV "NETWORK_SUBGRAPH_DEPLOYMENT" "QmdKXcBUHR3UyURqVRQHu1oV6VUkBrhi2vNvMx3bNDnUCc"
+            edit-var $INDEXER_ENV "NETWORK_SUBGRAPH_DEPLOYMENT" "QmU5tKrP7YNpm69iUdC3YuQWfJmdye1AHJLLc5pRC4dQBv"
             if [ -z $NETWORK_SUBGRAPH_ENDPOINT ]; then
-                edit-var $INDEXER_ENV "NETWORK_SUBGRAPH_ENDPOINT" "https://gateway-arbitrum.network.thegraph.com/api/$APIKEY/subgraphs/id/DZz4kDTdmzWLWsV373w2bSmoar3umKKH9y82SUKr5qmp"
+                edit-var $INDEXER_ENV "NETWORK_SUBGRAPH_ENDPOINT" "https://gateway-arbitrum.network.thegraph.com/api/$APIKEY/subgraphs/id/C8RdPboBCkPxRthYiFHnX6BxQLeckY5FeDzJfHNsU6x1"
             fi
 
             edit-var $INDEXER_ENV "TAP_SUBGRAPH_DEPLOYMENT" "QmUhiH6Z5xo6o3GNzsSvqpGKLmCt6w5WzKQ1yHk6C8AA8S"
@@ -209,6 +209,10 @@ generate-indexer-env()
             fi
 
             edit-var $INDEXER_ENV "BLOCKCHAIN_RECEIPTS_VERIFIER_ADDRESS" "0x33f9E93266ce0E108fc85DdE2f71dab555A0F05a"
+
+            edit-var $INDEXER_ENV "GRAPHTALLY_COLLECTOR_ADDRESS" "0x8f69F5C07477Ac46FBc491B1E6D91E2bb0111A9e"
+
+            edit-var $INDEXER_ENV "SUBGRAPH_SERVICE_ADDRESS" "0xb2Bb92d0DE618878E438b55D5846cfecD9301105"
 
             edit-var $INDEXER_ENV "TAP_SENDER_AGGREGATOR_ENDPOINTS" "\"0xDDE4cfFd3D9052A9cb618fC05a1Cd02be1f2F467 = \"https://tap-aggregator.network.thegraph.com\"\""
             ;;

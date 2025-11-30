@@ -66,13 +66,13 @@ recently_closed_allocation_buffer_secs = ${NETWORK_SUBGRAPHS_RECENTLY_CLOSED_ALL
 [subgraphs.escrow]
 # NOTE: It is heavily recomended to use both `query_url` and `deployment_id`,
 # Query URL for the Escrow subgraph.
-query_url = "${ESCROW_SUBGRAPH_ENDPOINT}"
+query_url = "${NETWORK_SUBGRAPH_ENDPOINT}"
 # Optional, Auth token will used a "bearer auth"
 # query_auth_token = "super-secret"
 
 # Optional, deployment to look for in the local `graph-node`, if locally indexed.
 # Locally indexing the subgraph is recommended.
-deployment_id = "${ESCROW_SUBGRAPH_DEPLOYMENT}"
+deployment_id = "${NETWORK_SUBGRAPH_DEPLOYMENT}"
 # Refreshing interval for the Escrow contracts information from the Escrow subgraph.
 syncing_interval_secs = ${ESCROW_SUBGRAPHS_SYNCING_INTERVAL_SECS}
 
@@ -81,6 +81,12 @@ syncing_interval_secs = ${ESCROW_SUBGRAPHS_SYNCING_INTERVAL_SECS}
 chain_id = ${BLOCKCHAIN_CHAIN_ID}
 # Contract address of TAP's receipt aggregate voucher (RAV) verifier.
 receipts_verifier_address = "${BLOCKCHAIN_RECEIPTS_VERIFIER_ADDRESS}"
+
+receipts_verifier_address_v2 = "${GRAPHTALLY_COLLECTOR_ADDRESS}"
+subgraph_service_address = "${SUBGRAPH_SERVICE_ADDRESS}"
+
+[horizon]
+enabled = true
 
 ##############################################
 # Specific configurations to indexer-service #

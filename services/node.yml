@@ -115,10 +115,10 @@ services:
             port: 8000
           "/network":
             port: 8000
-            dest: "/subgraphs/id/${NETWORK_SUBGRAPH_DEPLOYMENT:-QmdKXcBUHR3UyURqVRQHu1oV6VUkBrhi2vNvMx3bNDnUCc}"
+            dest: "/subgraphs/id/${NETWORK_SUBGRAPH_DEPLOYMENT:-QmU5tKrP7YNpm69iUdC3YuQWfJmdye1AHJLLc5pRC4dQBv}"
           "/network/ws":
             port: 8001
-            dest: "/subgraphs/id/${NETWORK_SUBGRAPH_DEPLOYMENT:-QmdKXcBUHR3UyURqVRQHu1oV6VUkBrhi2vNvMx3bNDnUCc}"
+            dest: "/subgraphs/id/${NETWORK_SUBGRAPH_DEPLOYMENT:-QmU5tKrP7YNpm69iUdC3YuQWfJmdye1AHJLLc5pRC4dQBv}"
           "/epoch":
             port: 8000
             dest: "/subgraphs/id/${EPOCH_SUBGRAPH_DEPLOYMENT:-QmeqJqJTZg3xqYaYhvc35JzyB7RBqEyJeexjTBDykvxNkJ}"

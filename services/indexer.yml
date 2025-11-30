@@ -25,7 +25,7 @@ networks:
 
 services:
   indexer-agent:
-    image: ghcr.io/graphprotocol/indexer-agent:${INDEXER_AGENT_VERSION:-v0.24.3}
+    image: ghcr.io/graphprotocol/indexer-agent:${INDEXER_AGENT_VERSION:-v0.25.0}
     container_name: ${INDEXER_NAME}-indexer-agent
     networks:
       - indexer
@@ -73,7 +73,7 @@ services:
     logging: *default-logging
 
   indexer-service:
-    image: ghcr.io/graphprotocol/indexer-service-rs:${INDEXER_SERVICE_VERSION:-v1.4.0}
+    image: ghcr.io/graphprotocol/indexer-service-rs:${INDEXER_SERVICE_VERSION:-v1.7.0}
     container_name: ${INDEXER_NAME}-indexer-service
     depends_on:
       - postgres-indexer
@@ -97,7 +97,7 @@ services:
     logging: *default-logging
 
   indexer-tap:
-    image: ghcr.io/graphprotocol/indexer-tap-agent:${INDEXER_TAP_VERSION:-v1.8.0}
+    image: ghcr.io/graphprotocol/indexer-tap-agent:${INDEXER_TAP_VERSION:-v1.11.0}
     container_name: ${INDEXER_NAME}-indexer-tap
     networks:
       - indexer

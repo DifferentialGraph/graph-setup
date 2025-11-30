@@ -120,7 +120,7 @@ services:
   indexer-cli:
     build:
       args:
-        VERSION: ${INDEXER_CLI_VERSION:-v0.24.3}
+        VERSION: ${INDEXER_CLI_VERSION:-v0.25.0}
         INDEXER_NAME: ${INDEXER_NAME}
       context: ../cli
       dockerfile: Dockerfile

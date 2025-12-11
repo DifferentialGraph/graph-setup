@@ -56,7 +56,7 @@ graph-start() {
 
     case $1 in
         "node")
-            node-start
+            graph-node-start
             ;;
         "indexer")
             indexer-start $2
@@ -82,7 +82,7 @@ graph-stop() {
         "indexer")
             [ -z $2 ] && { echo "Error: select indexer env"; return; }
             [ -f "$GRAPH_DIR/envs/$2.env" ] || { echo "Error: user $2.env file not found"; return 1; }
-            INDEXER_ENV=$GRAPHDIR/envs/${2}.env \
+            INDEXER_ENV=$GRAPH_DIR/envs/${2}.env \
             COMPOSE_FILE=$GRAPH_DIR/services/indexer.yml docker compose --env-file $GRAPH_DIR/envs/${2}.env stop
             ;;
         "monitor")

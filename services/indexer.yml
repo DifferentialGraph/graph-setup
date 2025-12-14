@@ -137,7 +137,7 @@ services:
     logging: *default-logging
 
   postgres-indexer:
-    image: postgres:${DB_INDEXER_VERSION:-17.5}
+    image: postgres:${DB_INDEXER_VERSION:-18.1}
     container_name: ${INDEXER_NAME}-postgres-indexer
     shm_size: 1gb
     networks:

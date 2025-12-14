@@ -20,7 +20,7 @@ networks:
 
 services:
   index-node:
-    image: graphprotocol/graph-node:${NODE_VERSION:-v0.40.0}
+    image: graphprotocol/graph-node:${NODE_VERSION:-v0.41.1}
     container_name: index-node
     networks:
       - graph-node
@@ -74,7 +74,7 @@ services:
     logging: *default-logging
 
   query-node:
-    image: graphprotocol/graph-node:${NODE_VERSION:-v0.40.0}
+    image: graphprotocol/graph-node:${NODE_VERSION:-v0.41.1}
     container_name: query-node
     networks:
       - graph-node
@@ -139,7 +139,7 @@ services:
         driver: "journald"
 
   postgres-node:
-    image: postgres:${DB_NODE_VERSION:-17.5}
+    image: postgres:${DB_NODE_VERSION:-18.1}
     container_name: postgres-node
     shm_size: 1gb
     networks:

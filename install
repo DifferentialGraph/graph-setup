@@ -1,6 +1,6 @@
 #!/bin/bash -i
-GRAPHDIR="$(cd "$(dirname "${BASH_SOURCE[0]:-${(%):-%x}}")" && pwd)"
-source $GRAPHDIR/utils/docker
+[ -z $GRAPH_DIR ] && GRAPH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-${(%):-%x}}")" && pwd)"
+source $GRAPH_DIR/utils/docker
 
 # -----------------------------------------------
 # --- PRELIMINARIES -----------------------------
@@ -99,10 +99,10 @@ query = "query_node"
 EOF
 }
 
-node-start() {
+graph-node-start() {
     # check and load environment file for graph node
-    [ -f "$GRAPHDIR/envs/node.env" ] || { echo "Error: user node.env file not found"; return 1; }
-    source $GRAPHDIR/envs/node.env
+    [ -f "$GRAPH_DIR/envs/node.env" ] || { echo "Error: user node.env file not found"; return 1; }
+    source $GRAPH_DIR/envs/node.env
 
     # generate graph node configuration file
     if ! volume-exists graph-node_config; then
@@ -112,9 +112,9 @@ node-start() {
     generate-node-config $NODE_CONFIG_FILE
 
     # run graph node service
-    COMPOSE_FILE=$GRAPHDIR/services/node.yml \
+    COMPOSE_FILE=$GRAPH_DIR/services/node.yml \
     COMPOSE_IGNORE_ORPHANS=True \
-    docker compose --env-file $GRAPHDIR/envs/node.env up -d --force-recreate --build
+    docker compose --env-file $GRAPH_DIR/envs/node.env up -d --force-recreate --build
 
     # attach graph node to reverse proxy
     if [ -n  $NODE_HOST ]; then
@@ -138,7 +138,7 @@ node-start() {
 
 graphnode-install() {
     whiptail --title "Graph Setup" --yesno "Install graph node?" 8 78 || { echo "User exit"; return; }
-    node-start || { return 1; }
+    graph-node-start || { return 1; }
 }
 
 
@@ -260,20 +260,20 @@ generate-indexer-env()
 
 indexer-start() {
     [ -z $1 ] && { echo "Error: select indexer env"; return; }
-    [ -f "$GRAPHDIR/envs/$1.env" ] || { echo "Error: user $1.env file not found"; return 1; }
-    source $GRAPHDIR/envs/$1.env
+    [ -f "$GRAPH_DIR/envs/$1.env" ] || { echo "Error: user $1.env file not found"; return 1; }
+    source $GRAPH_DIR/envs/$1.env
 
     # create volume for configuration file indexer tap and service
     if ! volume-exists ${INDEXER_NAME}-indexer_config; then
         docker volume create ${INDEXER_NAME}-indexer_config
     fi
-    cp $GRAPHDIR/config/indexer-config.toml /var/lib/docker/volumes/${INDEXER_NAME}-indexer_config/_data
+    cp $GRAPH_DIR/config/indexer-config.toml /var/lib/docker/volumes/${INDEXER_NAME}-indexer_config/_data
 
     # start indexer service
-    COMPOSE_FILE=$GRAPHDIR/services/indexer.yml \
+    COMPOSE_FILE=$GRAPH_DIR/services/indexer.yml \
     COMPOSE_IGNORE_ORPHANS=True \
-    INDEXER_ENV=$GRAPHDIR/envs/${1}.env \
-    docker compose --env-file $GRAPHDIR/envs/$1.env up -d --force-recreate --build
+    INDEXER_ENV=$GRAPH_DIR/envs/${1}.env \
+    docker compose --env-file $GRAPH_DIR/envs/$1.env up -d --force-recreate --build
 
     # generate cli hitory file
     [ -f /var/lib/docker/volumes/${INDEXER_NAME}-indexer_cli-history/_data/.bash_history ] && touch /var/lib/docker/volumes/${INDEXER_NAME}-indexer_cli-history/_data/.bash_history
@@ -363,17 +363,17 @@ fi
 }
 
 monitor-start() {
-    [ -f "$GRAPHDIR/envs/monitor.env" ] || { echo "Error: user monitor.env file not found"; return 1; }
-    source $GRAPHDIR/envs/monitor.env
+    [ -f "$GRAPH_DIR/envs/monitor.env" ] || { echo "Error: user monitor.env file not found"; return 1; }
+    source $GRAPH_DIR/envs/monitor.env
 
     # create volume for prometheus configuration files
     if ! volume-exists graph-monitor_prometheus-config; then
         docker volume create graph-monitor_prometheus-config
     fi
-    cp $GRAPHDIR/prometheus/alert.rules /var/lib/docker/volumes/graph-monitor_prometheus-config/_data/alert.rules
-    # envsubst < $GRAPHDIR/prometheus/prometheus.yml > /var/lib/docker/volumes/graph-monitor_prometheus-config/_data/prometheus.yml
+    cp $GRAPH_DIR/prometheus/alert.rules /var/lib/docker/volumes/graph-monitor_prometheus-config/_data/alert.rules
+    # envsubst < $GRAPH_DIR/prometheus/prometheus.yml > /var/lib/docker/volumes/graph-monitor_prometheus-config/_data/prometheus.yml
     PROMETHEUS_CONFIG="/var/lib/docker/volumes/graph-monitor_prometheus-config/_data/prometheus.yml"
-    cp $GRAPHDIR/prometheus/prometheus.yml $PROMETHEUS_CONFIG
+    cp $GRAPH_DIR/prometheus/prometheus.yml $PROMETHEUS_CONFIG
     gen-prometheus-config $PROMETHEUS_CONFIG
 
     # create volume for grafana dashboards and datasoruces
@@ -382,18 +382,18 @@ monitor-start() {
     else
         rm -rf /var/lib/docker/volumes/graph-monitor_grafana-provisioning/_data/*
     fi
-    cp -R $GRAPHDIR/grafana/dashboards/ $GRAPHDIR/grafana/datasources/ /var/lib/docker/volumes/graph-monitor_grafana-provisioning/_data
+    cp -R $GRAPH_DIR/grafana/dashboards/ $GRAPH_DIR/grafana/datasources/ /var/lib/docker/volumes/graph-monitor_grafana-provisioning/_data
 
     # create volume for alertmanager configuration file
     if ! volume-exists graph-monitor_alertmanager-config; then
         docker volume create graph-monitor_alertmanager-config
     fi
-    cp $GRAPHDIR/alertmanager/config.yml /var/lib/docker/volumes/graph-monitor_alertmanager-config/_data
+    cp $GRAPH_DIR/alertmanager/config.yml /var/lib/docker/volumes/graph-monitor_alertmanager-config/_data
 
     # start monitor services
-    COMPOSE_FILE=$GRAPHDIR/services/monitor.yml \
+    COMPOSE_FILE=$GRAPH_DIR/services/monitor.yml \
     COMPOSE_IGNORE_ORPHANS=True \
-    docker compose --env-file $GRAPHDIR/envs/monitor.env up -d --force-recreate --build
+    docker compose --env-file $GRAPH_DIR/envs/monitor.env up -d --force-recreate --build
 
     if [ -n "${NODE_NETWORK}" ]; then
         docker network connect ${NODE_NETWORK} graph-monitor-prometheus && docker network connect ${NODE_NETWORK} graph-monitor-grafana
@@ -443,7 +443,7 @@ if [ "${1}" != "--source" ]; then
         echo "Modifying .bashrc ..."
         echo -e "\n" >> ~/.bashrc
         echo "#graph-setup" >> ~/.bashrc
-        echo "export GRAPH_DIR=$GRAPHDIR" >> ~/.bashrc
+        echo "export GRAPH_DIR=$GRAPH_DIR" >> ~/.bashrc
         echo 'source $GRAPH_DIR/utils/manage' >> ~/.bashrc
         source ~/.bashrc
     fi

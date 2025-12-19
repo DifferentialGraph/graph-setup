@@ -7,9 +7,9 @@ datasources:
   type: postgres
   url: ${POSTGRES_HOST}
   user: ${POSTGRES_USER}
-  database: ${POSTGRES_DB}
   secureJsonData:
     password: ${POSTGRES_PASS}
   jsonData:
+    database: ${POSTGRES_DB}
     sslmode: disable
     postgresVersion: 906

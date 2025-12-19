@@ -94,5 +94,5 @@ The name of the variables in category are self explanatory. They define name, us
 ### Grafana & Prometheus Settings
 The name of the variables in category are self explanatory. They define user and password for accessing your Grafana and Prometheus dashboard.
 
-### Autoagora Settings
-Set `AUTOAGORA` to either **true** or **false** to activate or deactivate *autoagora*. The other variables define name, user and password of the database connected to autoagora as well as user and password for rabbitmq.
+## Horizon
+[Upgrade Guide](https://www.notion.so/edgeandnode/Graph-Horizon-indexer-stack-upgrade-guide-2658686fc7c2808984fbcc55e535e3b2)

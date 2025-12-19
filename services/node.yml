@@ -22,6 +22,9 @@ services:
   index-node:
     image: graphprotocol/graph-node:${NODE_VERSION:-v0.41.1}
     container_name: index-node
+    ulimits:
+      nofile: 1048576
+      memlock: -1
     networks:
       - graph-node
     expose:
@@ -115,10 +118,10 @@ services:
             port: 8000
           "/network":
             port: 8000
-            dest: "/subgraphs/id/${NETWORK_SUBGRAPH_DEPLOYMENT:-QmU5tKrP7YNpm69iUdC3YuQWfJmdye1AHJLLc5pRC4dQBv}"
+            dest: "/subgraphs/id/${NETWORK_SUBGRAPH_DEPLOYMENT:-QmbYLCwrDHRBCnPJ9hTvHLfRpNXbLbzBKks2uvHUSbeWAd}"
           "/network/ws":
             port: 8001
-            dest: "/subgraphs/id/${NETWORK_SUBGRAPH_DEPLOYMENT:-QmU5tKrP7YNpm69iUdC3YuQWfJmdye1AHJLLc5pRC4dQBv}"
+            dest: "/subgraphs/id/${NETWORK_SUBGRAPH_DEPLOYMENT:-QmbYLCwrDHRBCnPJ9hTvHLfRpNXbLbzBKks2uvHUSbeWAd}"
           "/epoch":
             port: 8000
             dest: "/subgraphs/id/${EPOCH_SUBGRAPH_DEPLOYMENT:-QmeqJqJTZg3xqYaYhvc35JzyB7RBqEyJeexjTBDykvxNkJ}"

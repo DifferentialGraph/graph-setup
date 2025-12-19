@@ -226,7 +226,7 @@
           "source": "url",
           "timePath": "",
           "type": "json",
-          "url": "http://query-node:8000/subgraphs/id/QmXnGVrg6DvscnvJd86aHAPLGyGrkM17weMrAsFAEMmQLL",
+          "url": ${NETWORK_SUBGRAPH_ENDPOINT},
           "url_options": {
             "body_content_type": "text/plain",
             "body_graphql_query": "query {\r\n  data:subgraphDeployments(orderBy: signalledTokens, orderDirection: desc) {\r\n    ipfsHash\r\n    signalledTokens\r\n    stakedTokens\r\n    originalName\r\n    indexingRewardAmount\r\n    queryFeesAmount\r\n    queryFeeRebates\r\n  }\r\n}\r\n",

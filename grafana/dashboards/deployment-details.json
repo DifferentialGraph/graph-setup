@@ -408,7 +408,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "with d as\n (select d.failed,\n         d.synced,\n         d.earliest_block_number,\n         d.latest_ethereum_block_number,\n         d.entity_count,\n         d.health\n    from subgraphs.subgraph_deployment d\n    where d.deployment = '[[deployment]]')  \nselect 'Health', d.health::text from d\n union all\nselect 'Synced', d.synced::text from d\n union all\nselect 'Earliest processed ethereum block',\n       to_char(d.earliest_block_number, '999G999G999G999') from d\n union all\nselect 'Latest processed ethereum block',\n       to_char(d.latest_ethereum_block_number, '999G999G999G999') from d\n union all\nselect 'Entity count', d.entity_count::text from d\n",
+          "rawSql": "with d as\n (select d.failed,\n         d.synced,\n         d.earliest_block_number,\n         d.latest_ethereum_block_number,\n         d.entity_count,\n         d.health\n    from subgraphs.deployment d\n    where d.deployment = '[[deployment]]')  \nselect 'Health', d.health::text from d\n union all\nselect 'Synced', d.synced::text from d\n union all\nselect 'Earliest processed ethereum block',\n       to_char(d.earliest_block_number, '999G999G999G999') from d\n union all\nselect 'Latest processed ethereum block',\n       to_char(d.latest_ethereum_block_number, '999G999G999G999') from d\n union all\nselect 'Entity count', d.entity_count::text from d\n",
           "refId": "A",
           "select": [
             [

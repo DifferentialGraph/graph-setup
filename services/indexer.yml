@@ -25,7 +25,7 @@ networks:
 
 services:
   indexer-agent:
-    image: ghcr.io/graphprotocol/indexer-agent:${INDEXER_AGENT_VERSION:-v0.25.5}
+    image: ghcr.io/graphprotocol/indexer-agent:${INDEXER_AGENT_VERSION:-v0.25.7}
     container_name: ${INDEXER_NAME}-indexer-agent
     networks:
       - indexer
@@ -70,11 +70,12 @@ services:
       INDEXER_AGENT_SUBGRAPH_MAX_BLOCK_DISTANCE: ${SUBGRAPH_MAX_BLOCK_DISTANCE}
       INDEXER_AGENT_SUBGRAPH_FRESHNESS_SLEEP_MILLESECONDS: ${SUBGRAPH_FRESHNESS_SLEEP_MILLESECONDS}
       INDEXER_AGENT_MAX_PROVISION_INITIAL_SIZE: ${MAX_PROVISION_INITIAL_SIZE}
+      INDEXER_AGENT_PAYMENTS_DESTINATION: ${PAYMENTS_DESTINATION}
     restart: unless-stopped
     logging: *default-logging
 
   indexer-service:
-    image: ghcr.io/graphprotocol/indexer-service-rs:${INDEXER_SERVICE_VERSION:-v1.8.0}
+    image: ghcr.io/graphprotocol/indexer-service-rs:${INDEXER_SERVICE_VERSION:-v2.0.1}
     container_name: ${INDEXER_NAME}-indexer-service
     depends_on:
       - postgres-indexer
@@ -98,7 +99,7 @@ services:
     logging: *default-logging
 
   indexer-tap:
-    image: ghcr.io/graphprotocol/indexer-tap-agent:${INDEXER_TAP_VERSION:-v1.12.2}
+    image: ghcr.io/graphprotocol/indexer-tap-agent:${INDEXER_TAP_VERSION:-v2.0.1}
     container_name: ${INDEXER_NAME}-indexer-tap
     networks:
       - indexer
@@ -121,7 +122,7 @@ services:
   indexer-cli:
     build:
       args:
-        VERSION: ${INDEXER_CLI_VERSION:-v0.25.5}
+        VERSION: ${INDEXER_CLI_VERSION:-v0.25.7}
         INDEXER_NAME: ${INDEXER_NAME}
       context: ../cli
       dockerfile: Dockerfile

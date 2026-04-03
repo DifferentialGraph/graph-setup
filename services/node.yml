@@ -20,7 +20,7 @@ networks:
 
 services:
   index-node:
-    image: graphprotocol/graph-node:${NODE_VERSION:-v0.41.1}
+    image: graphprotocol/graph-node:${NODE_VERSION:-v0.42.1}
     container_name: index-node
     ulimits:
       nofile: 1048576
@@ -77,7 +77,7 @@ services:
     logging: *default-logging
 
   query-node:
-    image: graphprotocol/graph-node:${NODE_VERSION:-v0.41.1}
+    image: graphprotocol/graph-node:${NODE_VERSION:-v0.42.1}
     container_name: query-node
     networks:
       - graph-node
@@ -118,10 +118,10 @@ services:
             port: 8000
           "/network":
             port: 8000
-            dest: "/subgraphs/id/${NETWORK_SUBGRAPH_DEPLOYMENT:-QmbYLCwrDHRBCnPJ9hTvHLfRpNXbLbzBKks2uvHUSbeWAd}"
+            dest: "/subgraphs/id/${NETWORK_SUBGRAPH_DEPLOYMENT:-QmT329Bej8AwSLahmgnmi6fdYkj3rorYAcCes45gDv9aJ4}"
           "/network/ws":
             port: 8001
-            dest: "/subgraphs/id/${NETWORK_SUBGRAPH_DEPLOYMENT:-QmbYLCwrDHRBCnPJ9hTvHLfRpNXbLbzBKks2uvHUSbeWAd}"
+            dest: "/subgraphs/id/${NETWORK_SUBGRAPH_DEPLOYMENT:-QmT329Bej8AwSLahmgnmi6fdYkj3rorYAcCes45gDv9aJ4}"
           "/epoch":
             port: 8000
             dest: "/subgraphs/id/${EPOCH_SUBGRAPH_DEPLOYMENT:-QmeqJqJTZg3xqYaYhvc35JzyB7RBqEyJeexjTBDykvxNkJ}"

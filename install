@@ -180,9 +180,9 @@ generate-indexer-env()
         "arbitrum-one")
             edit-var $INDEXER_ENV "NETWORK_PROVIDER" "$TXN_RPC_MAIN"
 
-            edit-var $INDEXER_ENV "NETWORK_SUBGRAPH_DEPLOYMENT" "QmU5tKrP7YNpm69iUdC3YuQWfJmdye1AHJLLc5pRC4dQBv"
+            edit-var $INDEXER_ENV "NETWORK_SUBGRAPH_DEPLOYMENT" "QmT329Bej8AwSLahmgnmi6fdYkj3rorYAcCes45gDv9aJ4"
             if [ -z $NETWORK_SUBGRAPH_ENDPOINT ]; then
-                edit-var $INDEXER_ENV "NETWORK_SUBGRAPH_ENDPOINT" "https://gateway-arbitrum.network.thegraph.com/api/$APIKEY/subgraphs/id/C8RdPboBCkPxRthYiFHnX6BxQLeckY5FeDzJfHNsU6x1"
+                edit-var $INDEXER_ENV "NETWORK_SUBGRAPH_ENDPOINT" "https://gateway-arbitrum.network.thegraph.com/api/$APIKEY/subgraphs/id/DZz4kDTdmzWLWsV373w2bSmoar3umKKH9y82SUKr5qmp"
             fi
 
             edit-var $INDEXER_ENV "TAP_SUBGRAPH_DEPLOYMENT" "QmUhiH6Z5xo6o3GNzsSvqpGKLmCt6w5WzKQ1yHk6C8AA8S"
